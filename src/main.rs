@@ -2,7 +2,7 @@ use std::io;
 
 use ratatui::{
     buffer::Buffer,
-    crossterm::event::{self, KeyCode, KeyEventKind},
+    crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind},
     layout::Rect,
     symbols::border,
     text::{Line, Text},
@@ -41,13 +41,23 @@ impl Todo {
     }
 
     fn handle_events(&mut self) -> io::Result<()> {
-        if let event::Event::Key(key) = event::read()? {
-            if key.kind == KeyEventKind::Press && key.code == KeyCode::Char('q') {
-                self.exit = true;
-            }
-        }
+        match event::read()? {
+            Event::Key(key_event) if key_event.kind == KeyEventKind::Press => self.handle_key_event(key_event),
+            _ => {},
+        };
 
         Ok(())
+    }
+
+    fn handle_key_event(&mut self, key_event: KeyEvent) {
+        match key_event.code {
+            KeyCode::Char('q') => self.exit(),
+            _ => {},
+        };
+    }
+
+    fn exit(&mut self) {
+        self.exit = true;
     }
 }
 
@@ -86,5 +96,12 @@ mod tests {
         ]);
 
         assert_eq!(buf, expected);
+    }
+
+    #[test]
+    fn test_handle_key_event() {
+        let mut todo = Todo::default();
+        todo.handle_key_event(KeyCode::Char('q').into());
+        assert!(todo.exit);
     }
 }
