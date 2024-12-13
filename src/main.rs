@@ -3,9 +3,9 @@ use std::io;
 use ratatui::{
     buffer::Buffer,
     crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind},
-    layout::Rect,
+    layout::{Layout, Rect, Constraint, Direction},
     symbols::border,
-    text::{Line, Text},
+    text::Line,
     widgets::{Block, Paragraph, Widget},
     DefaultTerminal, Frame,
 };
@@ -15,6 +15,17 @@ fn main() -> io::Result<()> {
     terminal.clear()?;
 
     let mut todo = Todo::default();
+
+    todo.list = vec![
+        Stuff::new(String::from("do this")),
+        Stuff::new(String::from("be there")),
+        Stuff::new(String::from("stop that")),
+        Stuff::new(String::from("see here")),
+    ];
+    todo.list.push(Stuff::new(String::from("sudo rm -rf /")));
+    let rm = todo.list.get_mut(4).unwrap();
+    rm.done = true;
+
     let result = todo.run(terminal);
 
     ratatui::restore();
@@ -23,6 +34,7 @@ fn main() -> io::Result<()> {
 
 #[derive(Default)]
 pub struct Todo {
+    list: Vec<Stuff>,
     exit: bool,
 }
 
@@ -63,17 +75,59 @@ impl Todo {
 
 impl Widget for &Todo {
     fn render(self, area: Rect, buf: &mut Buffer) {
-        let title = Line::from("here");
-        let title_bottom = Line::from("dragons");
-
-        let block = Block::bordered()
-            .title(title.left_aligned())
-            .title_bottom(title_bottom.right_aligned())
+        let todo: Vec<_> = self.list.iter().enumerate()
+            .filter(|(_, stuff)| !stuff.done)
+            .map(|(i, stuff)| {
+                let string = format!(" {} - {}", i.to_string(), stuff.text.clone());
+                Line::from(string)
+            })
+            .collect();
+        let todo_title = Line::from(" todo ");
+        let todo_block = Block::bordered()
+            .title(todo_title.left_aligned())
             .border_set(border::ROUNDED);
 
-        Paragraph::new(Text::from("be"))
-            .block(block)
-            .render(area, buf);
+        let done: Vec<_> = self.list.iter().enumerate()
+            .filter(|(_, stuff)| stuff.done)
+            .map(|(i, stuff)| {
+                let string = format!(" {} - {} ", i.to_string(), stuff.text.clone());
+                Line::from(string)
+            })
+            .collect();
+        let done_title = Line::from(" done ");
+        let done_block = Block::bordered()
+            .title(done_title.left_aligned())
+            .border_set(border::ROUNDED);
+
+        let split = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([
+                Constraint::Percentage(50),
+                Constraint::Percentage(50),
+            ].as_ref())
+            .split(area);
+
+        Paragraph::new(todo)
+            .block(todo_block)
+            .render(split[0], buf);
+        Paragraph::new(done)
+            .block(done_block)
+            .render(split[1], buf);
+    }
+}
+
+#[derive(Debug)]
+pub struct Stuff {
+    done: bool,
+    text: String,
+}
+
+impl Stuff {
+    pub fn new(text: String) -> Self {
+        Stuff {
+            done: false,
+            text,
+        }
     }
 }
 
@@ -83,16 +137,23 @@ mod tests {
 
     #[test]
     fn test_render() {
-        let todo = Todo::default();
-        let mut buf = Buffer::empty(Rect::new(0, 0, 20, 4));
+        let mut todo = Todo::default();
+        todo.list = vec![
+            Stuff::new(String::from("todo")),
+            Stuff::new(String::from("done")),
+        ];
+        let done = todo.list.get_mut(1).unwrap();
+        done.done = true;
+
+        let mut buf = Buffer::empty(Rect::new(0, 0, 24, 4));
 
         todo.render(buf.area, &mut buf);
 
         let expected = Buffer::with_lines(vec![
-            "╭here──────────────╮",
-            "│be                │",
-            "│                  │",
-            "╰───────────dragons╯",
+            "╭ todo ────╮╭ done ────╮",
+            "│ 0 - todo ││ 1 - done │",
+            "│          ││          │",
+            "╰──────────╯╰──────────╯",
         ]);
 
         assert_eq!(buf, expected);
