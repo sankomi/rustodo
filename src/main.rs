@@ -1,4 +1,7 @@
 use std::io;
+use std::path::Path;
+
+use sqlite::State;
 
 use ratatui::{
     buffer::Buffer,
@@ -10,19 +13,54 @@ use ratatui::{
     DefaultTerminal, Frame,
 };
 
+fn init_db() {
+    if !Path::new("sqlite.db").exists() {
+        let connection = sqlite::open("sqlite.db").unwrap();
+        let query = "
+            CREATE TABLE todos (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                done BOOLEAN DEFAULT 0,
+                text VARCHAR(255) DEFAULT ''
+            );
+            INSERT INTO todos (text)
+            VALUES
+                ('do this'),
+                ('be there'),
+                ('stop that'),
+                ('see here'),
+                ('sudo rm -rf /');
+        ";
+        connection.execute(query).unwrap();
+    }
+}
+
 fn main() -> io::Result<()> {
     let mut terminal = ratatui::init();
     terminal.clear()?;
 
     let mut todo = Todo::default();
+    todo.list = vec![];
 
-    todo.list = vec![
-        Stuff::new(String::from("do this")),
-        Stuff::new(String::from("be there")),
-        Stuff::new(String::from("stop that")),
-        Stuff::new(String::from("see here")),
-    ];
-    todo.list.push(Stuff::new(String::from("sudo rm -rf /")));
+    init_db();
+    let connection = sqlite::open("sqlite.db").unwrap();
+
+    let query = "SELECT * FROM todos;";
+    let mut stat = connection.prepare(query).unwrap();
+    while let Ok(State::Row) = stat.next() {
+        let id = stat.read::<i64, _>("id").unwrap();
+        let done = stat.read::<i64, _>("done").unwrap() == 1;
+        let text = stat.read::<String, _>("text").unwrap();
+        let stuff = Stuff { id, done, text };
+        todo.list.push(stuff);
+    }
+
+    let query = "SELECT * FROM todos WHERE id = ?;";
+    let stat = connection.prepare(query).unwrap();
+    let rows = stat.into_iter().bind((1, 1)).unwrap().map(|row| row.unwrap());
+    for _row in rows {
+        //println!("{}", row.read::<&str, _>("text"));
+    }
+
     let rm = todo.list.get_mut(4).unwrap();
     rm.done = true;
 
@@ -75,10 +113,10 @@ impl Todo {
 
 impl Widget for &Todo {
     fn render(self, area: Rect, buf: &mut Buffer) {
-        let todo: Vec<_> = self.list.iter().enumerate()
-            .filter(|(_, stuff)| !stuff.done)
-            .map(|(i, stuff)| {
-                let string = format!(" {} - {}", i.to_string(), stuff.text.clone());
+        let todo: Vec<_> = self.list.iter()
+            .filter(|stuff| !stuff.done)
+            .map(|stuff| {
+                let string = format!(" {} - {} ", stuff.id.to_string(), stuff.text.clone());
                 Line::from(string)
             })
             .collect();
@@ -87,10 +125,10 @@ impl Widget for &Todo {
             .title(todo_title.left_aligned())
             .border_set(border::ROUNDED);
 
-        let done: Vec<_> = self.list.iter().enumerate()
-            .filter(|(_, stuff)| stuff.done)
-            .map(|(i, stuff)| {
-                let string = format!(" {} - {} ", i.to_string(), stuff.text.clone());
+        let done: Vec<_> = self.list.iter()
+            .filter(|stuff| stuff.done)
+            .map(|stuff| {
+                let string = format!(" {} - {} ", stuff.id.to_string(), stuff.text.clone());
                 Line::from(string)
             })
             .collect();
@@ -118,17 +156,9 @@ impl Widget for &Todo {
 
 #[derive(Debug)]
 pub struct Stuff {
+    id: i64,
     done: bool,
     text: String,
-}
-
-impl Stuff {
-    pub fn new(text: String) -> Self {
-        Stuff {
-            done: false,
-            text,
-        }
-    }
 }
 
 #[cfg(test)]
@@ -139,8 +169,8 @@ mod tests {
     fn test_render() {
         let mut todo = Todo::default();
         todo.list = vec![
-            Stuff::new(String::from("todo")),
-            Stuff::new(String::from("done")),
+            Stuff { id: 1, done: false, text: String::from("todo") },
+            Stuff { id: 2, done: false, text: String::from("done") },
         ];
         let done = todo.list.get_mut(1).unwrap();
         done.done = true;
@@ -151,7 +181,7 @@ mod tests {
 
         let expected = Buffer::with_lines(vec![
             "╭ todo ────╮╭ done ────╮",
-            "│ 0 - todo ││ 1 - done │",
+            "│ 1 - todo ││ 2 - done │",
             "│          ││          │",
             "╰──────────╯╰──────────╯",
         ]);
