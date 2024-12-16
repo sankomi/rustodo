@@ -23,13 +23,13 @@ fn init_db() {
                 done BOOLEAN DEFAULT 0,
                 text VARCHAR(255) DEFAULT ''
             );
-            INSERT INTO todos (text)
+            INSERT INTO todos (text, done)
             VALUES
-                ('do this'),
-                ('be there'),
-                ('stop that'),
-                ('see here'),
-                ('sudo rm -rf /');
+                ('do this', 0),
+                ('be there', 0),
+                ('stop that', 0),
+                ('see here', 0),
+                ('sudo rm -rf /', 1);
         ";
         connection.execute(query).unwrap();
     }
@@ -40,7 +40,8 @@ fn main() -> io::Result<()> {
     terminal.clear()?;
 
     let mut todo = Todo::default();
-    todo.list = vec![];
+    todo.todos = vec![];
+    todo.dones = vec![];
 
     init_db();
     let connection = sqlite::open("sqlite.db").unwrap();
@@ -51,8 +52,13 @@ fn main() -> io::Result<()> {
         let id = stat.read::<i64, _>("id").unwrap();
         let done = stat.read::<i64, _>("done").unwrap() == 1;
         let text = stat.read::<String, _>("text").unwrap();
-        let stuff = Stuff { id, done, text };
-        todo.list.push(stuff);
+        let stuff = Stuff { id, text };
+
+        if done {
+            todo.dones.push(stuff);
+        } else {
+            todo.todos.push(stuff);
+        }
     }
 
     let query = "SELECT * FROM todos WHERE id = ?;";
@@ -61,9 +67,6 @@ fn main() -> io::Result<()> {
     for _row in rows {
         //println!("{}", row.read::<&str, _>("text"));
     }
-
-    let rm = todo.list.get_mut(4).unwrap();
-    rm.done = true;
 
     let result = todo.run(terminal);
 
@@ -74,7 +77,8 @@ fn main() -> io::Result<()> {
 #[derive(Default)]
 pub struct Todo {
     current: (bool, usize),
-    list: Vec<Stuff>,
+    todos: Vec<Stuff>,
+    dones: Vec<Stuff>,
     exit: bool,
 }
 
@@ -105,7 +109,15 @@ impl Todo {
         match key_event.code {
             KeyCode::Char('q') => self.exit(),
             KeyCode::Char('j') => {
-                self.current.1 += 1;
+                if self.current.0 {
+                    if self.current.1 < self.dones.len() - 1 {
+                        self.current.1 += 1;
+                    }
+                } else {
+                    if self.current.1 < self.todos.len() - 1 {
+                        self.current.1 += 1;
+                    }
+                }
             },
             KeyCode::Char('k') => {
                 if self.current.1 > 0 {
@@ -114,9 +126,29 @@ impl Todo {
             },
             KeyCode::Char('h') => {
                 self.current.0 = !self.current.0;
+
+                if self.current.0 {
+                    if self.current.1 >= self.dones.len() {
+                        self.current.1 = self.dones.len() - 1;
+                    }
+                } else {
+                    if self.current.1 >= self.todos.len() {
+                        self.current.1 = self.todos.len() - 1;
+                    }
+                }
             },
             KeyCode::Char('l') => {
                 self.current.0 = !self.current.0;
+
+                if self.current.0 {
+                    if self.current.1 >= self.dones.len() {
+                        self.current.1 = self.dones.len() - 1;
+                    }
+                } else {
+                    if self.current.1 >= self.todos.len() {
+                        self.current.1 = self.todos.len() - 1;
+                    }
+                }
             },
             _ => {},
         };
@@ -129,8 +161,7 @@ impl Todo {
 
 impl Widget for &Todo {
     fn render(self, area: Rect, buf: &mut Buffer) {
-        let todo: Vec<_> = self.list.iter()
-            .filter(|stuff| !stuff.done)
+        let todos: Vec<_> = self.todos.iter()
             .enumerate()
             .map(|(i, stuff)| {
                 let string = format!(" {} - {} ", stuff.id.to_string(), stuff.text.clone());
@@ -146,8 +177,7 @@ impl Widget for &Todo {
             .title(todo_title.left_aligned())
             .border_set(border::ROUNDED);
 
-        let done: Vec<_> = self.list.iter()
-            .filter(|stuff| stuff.done)
+        let dones: Vec<_> = self.dones.iter()
             .enumerate()
             .map(|(i, stuff)| {
                 let string = format!(" {} - {} ", stuff.id.to_string(), stuff.text.clone());
@@ -171,10 +201,10 @@ impl Widget for &Todo {
             ].as_ref())
             .split(area);
 
-        Paragraph::new(todo)
+        Paragraph::new(todos)
             .block(todo_block)
             .render(split[0], buf);
-        Paragraph::new(done)
+        Paragraph::new(dones)
             .block(done_block)
             .render(split[1], buf);
     }
@@ -183,33 +213,34 @@ impl Widget for &Todo {
 #[derive(Debug)]
 pub struct Stuff {
     id: i64,
-    done: bool,
     text: String,
 }
 
 #[cfg(test)]
 mod tests {
+    use ratatui::text::Span;
+
     use super::*;
 
     #[test]
     fn test_render() {
         let mut todo = Todo::default();
-        todo.list = vec![
-            Stuff { id: 1, done: false, text: String::from("todo") },
-            Stuff { id: 2, done: false, text: String::from("done") },
+        todo.todos = vec![
+            Stuff { id: 1, text: String::from("todo") },
         ];
-        let done = todo.list.get_mut(1).unwrap();
-        done.done = true;
+        todo.dones = vec![
+            Stuff { id: 2, text: String::from("done") },
+        ];
 
         let mut buf = Buffer::empty(Rect::new(0, 0, 24, 4));
 
         todo.render(buf.area, &mut buf);
 
         let expected = Buffer::with_lines(vec![
-            "╭ todo ────╮╭ done ────╮",
-            "│ 1 - todo ││ 2 - done │",
-            "│          ││          │",
-            "╰──────────╯╰──────────╯",
+            vec![Span::from("╭ todo ────╮╭ done ────╮")],
+            vec![Span::from("│"), " 1 - todo ".white().on_red(), Span::from("││ 2 - done │")],
+            vec![Span::from("│          ││          │")],
+            vec![Span::from("╰──────────╯╰──────────╯")],
         ]);
 
         assert_eq!(buf, expected);
