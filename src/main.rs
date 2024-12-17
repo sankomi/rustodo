@@ -1,7 +1,4 @@
 use std::io;
-use std::path::Path;
-
-use sqlite::State;
 
 use ratatui::{
     buffer::Buffer,
@@ -14,59 +11,14 @@ use ratatui::{
     DefaultTerminal, Frame,
 };
 
-fn init_db() {
-    if !Path::new("sqlite.db").exists() {
-        let connection = sqlite::open("sqlite.db").unwrap();
-        let query = "
-            CREATE TABLE todos (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                done BOOLEAN DEFAULT 0,
-                text VARCHAR(255) DEFAULT ''
-            );
-            INSERT INTO todos (text, done)
-            VALUES
-                ('do this', 0),
-                ('be there', 0),
-                ('stop that', 0),
-                ('see here', 0),
-                ('sudo rm -rf /', 1);
-        ";
-        connection.execute(query).unwrap();
-    }
-}
+mod db;
+use db::Db;
 
 fn main() -> io::Result<()> {
     let mut terminal = ratatui::init();
     terminal.clear()?;
 
-    let mut todo = Todo::default();
-    todo.todos = vec![];
-    todo.dones = vec![];
-
-    init_db();
-    let connection = sqlite::open("sqlite.db").unwrap();
-
-    let query = "SELECT * FROM todos;";
-    let mut stat = connection.prepare(query).unwrap();
-    while let Ok(State::Row) = stat.next() {
-        let id = stat.read::<i64, _>("id").unwrap();
-        let done = stat.read::<i64, _>("done").unwrap() == 1;
-        let text = stat.read::<String, _>("text").unwrap();
-        let stuff = Stuff { id, text };
-
-        if done {
-            todo.dones.push(stuff);
-        } else {
-            todo.todos.push(stuff);
-        }
-    }
-
-    let query = "SELECT * FROM todos WHERE id = ?;";
-    let stat = connection.prepare(query).unwrap();
-    let rows = stat.into_iter().bind((1, 1)).unwrap().map(|row| row.unwrap());
-    for _row in rows {
-        //println!("{}", row.read::<&str, _>("text"));
-    }
+    let mut todo = Todo::new();
 
     let result = todo.run(terminal);
 
@@ -74,8 +26,8 @@ fn main() -> io::Result<()> {
     result
 }
 
-#[derive(Default)]
 pub struct Todo {
+    db: Db,
     current: (bool, usize),
     todos: Vec<Stuff>,
     dones: Vec<Stuff>,
@@ -83,6 +35,20 @@ pub struct Todo {
 }
 
 impl Todo {
+    pub fn new() -> Self {
+        let mut todo = Todo {
+            db: Db::new(),
+            current: (false, 0),
+            todos: vec![],
+            dones: vec![],
+            exit: false,
+        };
+
+        todo.update();
+
+        todo
+    }
+
     pub fn run(&mut self, mut terminal: DefaultTerminal) -> io::Result<()> {
         while !self.exit {
             terminal.draw(|frame| self.draw(frame))?;
@@ -90,6 +56,10 @@ impl Todo {
         }
 
         Ok(())
+    }
+
+    pub fn update(&mut self) {
+        (self.todos, self.dones) = self.db.get_todos();
     }
 
     fn draw(&self, frame: &mut Frame) {
@@ -213,6 +183,7 @@ impl Widget for &Todo {
 #[derive(Debug)]
 pub struct Stuff {
     id: i64,
+    done: bool,
     text: String,
 }
 
@@ -224,12 +195,12 @@ mod tests {
 
     #[test]
     fn test_render() {
-        let mut todo = Todo::default();
+        let mut todo = Todo::new();
         todo.todos = vec![
-            Stuff { id: 1, text: String::from("todo") },
+            Stuff { id: 1, done: false, text: String::from("todo") },
         ];
         todo.dones = vec![
-            Stuff { id: 2, text: String::from("done") },
+            Stuff { id: 2, done: true, text: String::from("done") },
         ];
 
         let mut buf = Buffer::empty(Rect::new(0, 0, 24, 4));
@@ -248,7 +219,7 @@ mod tests {
 
     #[test]
     fn test_handle_key_event() {
-        let mut todo = Todo::default();
+        let mut todo = Todo::new();
         todo.handle_key_event(KeyCode::Char('q').into());
         assert!(todo.exit);
     }
