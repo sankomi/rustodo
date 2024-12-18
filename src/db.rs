@@ -56,4 +56,18 @@ impl Db {
 
         (todos, dones)
     }
+
+    pub fn flip(&self, id: i64) {
+        let query = "SELECT * FROM todos WHERE id = ?;";
+        let stat = self.connection.prepare(query).unwrap();
+        let rows = stat.into_iter().bind((1, id)).unwrap().map(|row| row.unwrap());
+
+        for row in rows {
+            let done = 1 - row.read::<i64, _>("done");
+            let query = "UPDATE todos SET done = ? WHERE id = ?;";
+            let stat = self.connection.prepare(query).unwrap();
+            stat.into_iter().bind((1, done)).unwrap().bind((2, id)).unwrap().next();
+            break;
+        }
+    }
 }

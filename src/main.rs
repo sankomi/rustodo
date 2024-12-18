@@ -60,6 +60,17 @@ impl Todo {
 
     pub fn update(&mut self) {
         (self.todos, self.dones) = self.db.get_todos();
+
+        if self.current.0 {
+            if self.dones.len() > 0 && self.current.1 >= self.dones.len() {
+                self.current.1 = self.dones.len() - 1;
+            }
+        } else {
+            if self.todos.len() > 0 && self.current.1 >= self.todos.len() {
+                self.current.1 = self.todos.len() - 1;
+            }
+        }
+
     }
 
     fn draw(&self, frame: &mut Frame) {
@@ -80,11 +91,11 @@ impl Todo {
             KeyCode::Char('q') => self.exit(),
             KeyCode::Char('j') => {
                 if self.current.0 {
-                    if self.current.1 < self.dones.len() - 1 {
+                    if self.dones.len() > 0 && self.current.1 < self.dones.len() - 1 {
                         self.current.1 += 1;
                     }
                 } else {
-                    if self.current.1 < self.todos.len() - 1 {
+                    if self.todos.len() > 0 && self.current.1 < self.todos.len() - 1 {
                         self.current.1 += 1;
                     }
                 }
@@ -98,12 +109,20 @@ impl Todo {
                 self.current.0 = !self.current.0;
 
                 if self.current.0 {
-                    if self.current.1 >= self.dones.len() {
-                        self.current.1 = self.dones.len() - 1;
+                    if self.dones.len() > 0 {
+                        if self.current.1 >= self.dones.len() {
+                            self.current.1 = self.dones.len() - 1;
+                        }
+                    } else {
+                        self.current.1 = 0;
                     }
                 } else {
-                    if self.current.1 >= self.todos.len() {
-                        self.current.1 = self.todos.len() - 1;
+                    if self.todos.len() > 0 {
+                        if self.current.1 >= self.todos.len() {
+                            self.current.1 = self.todos.len() - 1;
+                        }
+                    } else {
+                        self.current.1 = 0;
                     }
                 }
             },
@@ -111,16 +130,46 @@ impl Todo {
                 self.current.0 = !self.current.0;
 
                 if self.current.0 {
-                    if self.current.1 >= self.dones.len() {
-                        self.current.1 = self.dones.len() - 1;
+                    if self.dones.len() > 0 {
+                        if self.current.1 >= self.dones.len() {
+                            self.current.1 = self.dones.len() - 1;
+                        }
+                    } else {
+                        self.current.1 = 0;
                     }
                 } else {
-                    if self.current.1 >= self.todos.len() {
-                        self.current.1 = self.todos.len() - 1;
+                    if self.todos.len() > 0 {
+                        if self.current.1 >= self.todos.len() {
+                            self.current.1 = self.todos.len() - 1;
+                        }
+                    } else {
+                        self.current.1 = 0;
                     }
                 }
             },
-            _ => {},
+            KeyCode::Char('d') => {
+                let done = self.current.0;
+                let index = self.current.1;
+
+                let stuff;
+                if done {
+                    if self.dones.len() > index {
+                        stuff = self.dones.get(index).unwrap();
+                    } else {
+                        return;
+                    }
+                } else {
+                    if self.todos.len() > index {
+                        stuff = self.todos.get(index).unwrap();
+                    } else {
+                        return;
+                    }
+                }
+
+                self.db.flip(stuff.id);
+                self.update();
+            },
+            _ => (),
         };
     }
 
