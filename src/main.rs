@@ -7,7 +7,7 @@ use ratatui::{
     style::Stylize,
     symbols::border,
     text::Line,
-    widgets::{Block, Paragraph, Widget},
+    widgets::{Block, Paragraph, Widget, Padding, Clear},
     DefaultTerminal, Frame,
 };
 
@@ -31,6 +31,7 @@ pub struct Todo {
     current: (bool, usize),
     todos: Vec<Stuff>,
     dones: Vec<Stuff>,
+    detail: bool,
     exit: bool,
 }
 
@@ -41,6 +42,7 @@ impl Todo {
             current: (false, 0),
             todos: vec![],
             dones: vec![],
+            detail: false,
             exit: false,
         };
 
@@ -75,6 +77,42 @@ impl Todo {
 
     fn draw(&self, frame: &mut Frame) {
         frame.render_widget(self, frame.area());
+
+        if self.detail {
+            let stuff;
+            if self.current.0 {
+                stuff = &self.dones[self.current.1];
+            } else {
+                stuff = &self.todos[self.current.1];
+            }
+
+            let detail_title = Line::from(format!(" {} ", stuff.id.to_string()));
+            let detail_block = Block::bordered()
+                .title(detail_title.left_aligned())
+                .padding(Padding::new(1, 1, 0, 0))
+                .border_set(border::ROUNDED);
+            let middle = Layout::default()
+                .direction(Direction::Vertical)
+                .constraints([
+                    Constraint::Percentage(20),
+                    Constraint::Percentage(60),
+                    Constraint::Percentage(20),
+                ])
+                .split(frame.area())[1];
+            let middle = Layout::default()
+                .direction(Direction::Horizontal)
+                .constraints([
+                    Constraint::Percentage(20),
+                    Constraint::Percentage(60),
+                    Constraint::Percentage(20),
+                ])
+                .split(middle)[1];
+
+            let paragraph = Paragraph::new(stuff.text.clone())
+                .block(detail_block);
+            frame.render_widget(Clear, middle);
+            frame.render_widget(paragraph, middle);
+        }
     }
 
     fn handle_events(&mut self) -> io::Result<()> {
@@ -87,90 +125,102 @@ impl Todo {
     }
 
     fn handle_key_event(&mut self, key_event: KeyEvent) {
-        match key_event.code {
-            KeyCode::Char('q') => self.exit(),
-            KeyCode::Char('j') => {
-                if self.current.0 {
-                    if self.dones.len() > 0 && self.current.1 < self.dones.len() - 1 {
-                        self.current.1 += 1;
-                    }
-                } else {
-                    if self.todos.len() > 0 && self.current.1 < self.todos.len() - 1 {
-                        self.current.1 += 1;
-                    }
-                }
-            },
-            KeyCode::Char('k') => {
-                if self.current.1 > 0 {
-                    self.current.1 -= 1;
-                }
-            },
-            KeyCode::Char('h') => {
-                self.current.0 = !self.current.0;
-
-                if self.current.0 {
-                    if self.dones.len() > 0 {
-                        if self.current.1 >= self.dones.len() {
-                            self.current.1 = self.dones.len() - 1;
+        if self.detail {
+            match key_event.code {
+                KeyCode::Char('s') => {
+                    self.detail = false;
+                },
+                _ => {},
+            }
+        } else {
+            match key_event.code {
+                KeyCode::Char('q') => self.exit(),
+                KeyCode::Char('j') => {
+                    if self.current.0 {
+                        if self.dones.len() > 0 && self.current.1 < self.dones.len() - 1 {
+                            self.current.1 += 1;
                         }
                     } else {
-                        self.current.1 = 0;
+                        if self.todos.len() > 0 && self.current.1 < self.todos.len() - 1 {
+                            self.current.1 += 1;
+                        }
                     }
-                } else {
-                    if self.todos.len() > 0 {
-                        if self.current.1 >= self.todos.len() {
-                            self.current.1 = self.todos.len() - 1;
+                },
+                KeyCode::Char('k') => {
+                    if self.current.1 > 0 {
+                        self.current.1 -= 1;
+                    }
+                },
+                KeyCode::Char('h') => {
+                    self.current.0 = !self.current.0;
+
+                    if self.current.0 {
+                        if self.dones.len() > 0 {
+                            if self.current.1 >= self.dones.len() {
+                                self.current.1 = self.dones.len() - 1;
+                            }
+                        } else {
+                            self.current.1 = 0;
                         }
                     } else {
-                        self.current.1 = 0;
+                        if self.todos.len() > 0 {
+                            if self.current.1 >= self.todos.len() {
+                                self.current.1 = self.todos.len() - 1;
+                            }
+                        } else {
+                            self.current.1 = 0;
+                        }
                     }
-                }
-            },
-            KeyCode::Char('l') => {
-                self.current.0 = !self.current.0;
+                },
+                KeyCode::Char('l') => {
+                    self.current.0 = !self.current.0;
 
-                if self.current.0 {
-                    if self.dones.len() > 0 {
-                        if self.current.1 >= self.dones.len() {
-                            self.current.1 = self.dones.len() - 1;
+                    if self.current.0 {
+                        if self.dones.len() > 0 {
+                            if self.current.1 >= self.dones.len() {
+                                self.current.1 = self.dones.len() - 1;
+                            }
+                        } else {
+                            self.current.1 = 0;
                         }
                     } else {
-                        self.current.1 = 0;
+                        if self.todos.len() > 0 {
+                            if self.current.1 >= self.todos.len() {
+                                self.current.1 = self.todos.len() - 1;
+                            }
+                        } else {
+                            self.current.1 = 0;
+                        }
                     }
-                } else {
-                    if self.todos.len() > 0 {
-                        if self.current.1 >= self.todos.len() {
-                            self.current.1 = self.todos.len() - 1;
+                },
+                KeyCode::Char('d') => {
+                    let done = self.current.0;
+                    let index = self.current.1;
+
+                    let stuff;
+                    if done {
+                        if self.dones.len() > index {
+                            stuff = self.dones.get(index).unwrap();
+                        } else {
+                            return;
                         }
                     } else {
-                        self.current.1 = 0;
+                        if self.todos.len() > index {
+                            stuff = self.todos.get(index).unwrap();
+                        } else {
+                            return;
+                        }
                     }
-                }
-            },
-            KeyCode::Char('d') => {
-                let done = self.current.0;
-                let index = self.current.1;
 
-                let stuff;
-                if done {
-                    if self.dones.len() > index {
-                        stuff = self.dones.get(index).unwrap();
-                    } else {
-                        return;
-                    }
-                } else {
-                    if self.todos.len() > index {
-                        stuff = self.todos.get(index).unwrap();
-                    } else {
-                        return;
-                    }
-                }
-
-                self.db.flip(stuff.id);
-                self.update();
-            },
-            _ => (),
-        };
+                    self.db.flip(stuff.id);
+                    self.update();
+                },
+                KeyCode::Char('s') => {
+                    self.detail = true;
+                },
+                _ => (),
+            };
+        }
     }
 
     fn exit(&mut self) {
@@ -183,7 +233,7 @@ impl Widget for &Todo {
         let todos: Vec<_> = self.todos.iter()
             .enumerate()
             .map(|(i, stuff)| {
-                let string = format!(" {} - {} ", stuff.id.to_string(), stuff.text.clone());
+                let string = format!("{} - {}", stuff.id.to_string(), stuff.text.clone());
                 if !self.current.0 && self.current.1 == i {
                     Line::from(string.white().on_red())
                 } else {
@@ -194,12 +244,13 @@ impl Widget for &Todo {
         let todo_title = Line::from(" todo ");
         let todo_block = Block::bordered()
             .title(todo_title.left_aligned())
+            .padding(Padding::new(1, 1, 0, 0))
             .border_set(border::ROUNDED);
 
         let dones: Vec<_> = self.dones.iter()
             .enumerate()
             .map(|(i, stuff)| {
-                let string = format!(" {} - {} ", stuff.id.to_string(), stuff.text.clone());
+                let string = format!("{} - {}", stuff.id.to_string(), stuff.text.clone());
                 if self.current.0 && self.current.1 == i {
                     Line::from(string.white().on_red())
                 } else {
@@ -210,6 +261,7 @@ impl Widget for &Todo {
         let done_title = Line::from(" done ");
         let done_block = Block::bordered()
             .title(done_title.left_aligned())
+            .padding(Padding::new(1, 1, 0, 0))
             .border_set(border::ROUNDED);
 
         let split = Layout::default()
