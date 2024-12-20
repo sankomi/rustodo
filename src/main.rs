@@ -64,12 +64,12 @@ impl Todo {
         (self.todos, self.dones) = self.db.get_todos();
 
         if self.current.0 {
-            if self.dones.len() > 0 && self.current.1 >= self.dones.len() {
-                self.current.1 = self.dones.len() - 1;
+            if self.current.1 >= self.dones.len() {
+                self.current.1 = self.dones.len().saturating_sub(1);
             }
         } else {
-            if self.todos.len() > 0 && self.current.1 >= self.todos.len() {
-                self.current.1 = self.todos.len() - 1;
+            if self.current.1 >= self.todos.len() {
+                self.current.1 = self.todos.len().saturating_sub(1);
             }
         }
 
@@ -137,11 +137,11 @@ impl Todo {
                 KeyCode::Char('q') => self.exit(),
                 KeyCode::Char('j') => {
                     if self.current.0 {
-                        if self.dones.len() > 0 && self.current.1 < self.dones.len() - 1 {
+                        if self.current.1 < self.dones.len().saturating_sub(1) {
                             self.current.1 += 1;
                         }
                     } else {
-                        if self.todos.len() > 0 && self.current.1 < self.todos.len() - 1 {
+                        if self.current.1 < self.todos.len().saturating_sub(1) {
                             self.current.1 += 1;
                         }
                     }
@@ -155,20 +155,12 @@ impl Todo {
                     self.current.0 = !self.current.0;
 
                     if self.current.0 {
-                        if self.dones.len() > 0 {
-                            if self.current.1 >= self.dones.len() {
-                                self.current.1 = self.dones.len() - 1;
-                            }
-                        } else {
-                            self.current.1 = 0;
+                        if self.current.1 >= self.dones.len() {
+                            self.current.1 = self.dones.len().saturating_sub(1);
                         }
                     } else {
-                        if self.todos.len() > 0 {
-                            if self.current.1 >= self.todos.len() {
-                                self.current.1 = self.todos.len() - 1;
-                            }
-                        } else {
-                            self.current.1 = 0;
+                        if self.current.1 >= self.todos.len() {
+                            self.current.1 = self.todos.len().saturating_sub(1);
                         }
                     }
                 },
@@ -176,20 +168,12 @@ impl Todo {
                     self.current.0 = !self.current.0;
 
                     if self.current.0 {
-                        if self.dones.len() > 0 {
-                            if self.current.1 >= self.dones.len() {
-                                self.current.1 = self.dones.len() - 1;
-                            }
-                        } else {
-                            self.current.1 = 0;
+                        if self.current.1 >= self.dones.len() {
+                            self.current.1 = self.dones.len().saturating_sub(1);
                         }
                     } else {
-                        if self.todos.len() > 0 {
-                            if self.current.1 >= self.todos.len() {
-                                self.current.1 = self.todos.len() - 1;
-                            }
-                        } else {
-                            self.current.1 = 0;
+                        if self.current.1 >= self.todos.len() {
+                            self.current.1 = self.todos.len().saturating_sub(1);
                         }
                     }
                 },
