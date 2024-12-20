@@ -218,6 +218,10 @@ impl Todo {
                 KeyCode::Char('s') => {
                     self.detail = true;
                 },
+                KeyCode::Char('a') => {
+                    self.db.add_todo(&String::from("sudo rm -rf /"));
+                    self.update();
+                },
                 _ => (),
             };
         }

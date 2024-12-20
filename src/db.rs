@@ -70,4 +70,11 @@ impl Db {
             break;
         }
     }
+
+    pub fn add_todo(&self, text: &str) {
+        let query = "INSERT INTO todos (text) VALUES (?);";
+        let mut stat = self.connection.prepare(query).unwrap();
+        stat.bind((1, text)).unwrap();
+        stat.next().unwrap();
+    }
 }
