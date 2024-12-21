@@ -10,6 +10,8 @@ use ratatui::{
     widgets::{Block, Paragraph, Widget, Padding, Clear},
     DefaultTerminal, Frame,
 };
+use tui_input::backend::crossterm::EventHandler;
+use tui_input::Input;
 
 mod db;
 use db::Db;
@@ -31,6 +33,8 @@ pub struct Todo {
     current: (bool, usize),
     todos: Vec<Stuff>,
     dones: Vec<Stuff>,
+    input: Input,
+    adding: bool,
     detail: bool,
     exit: bool,
 }
@@ -42,6 +46,8 @@ impl Todo {
             current: (false, 0),
             todos: vec![],
             dones: vec![],
+            input: Input::default(),
+            adding: false,
             detail: false,
             exit: false,
         };
@@ -78,26 +84,49 @@ impl Todo {
     fn draw(&self, frame: &mut Frame) {
         frame.render_widget(self, frame.area());
 
-        if self.detail {
-            let stuff;
-            if self.current.0 {
-                stuff = &self.dones[self.current.1];
+        if self.detail || self.adding {
+            let title_string;
+            let content_string;
+
+            if self.detail {
+                let stuff;
+                if self.current.0 {
+                    stuff = &self.dones[self.current.1];
+                } else {
+                    stuff = &self.todos[self.current.1];
+                }
+                title_string = format!(" {} ", stuff.id.to_string());
+                content_string = stuff.text.clone();
+            } else if self.adding {
+                title_string = String::from(" new todo ");
+                content_string = self.input.value().to_string();
             } else {
-                stuff = &self.todos[self.current.1];
+                title_string = String::from("");
+                content_string = String::from("");
             }
 
-            let detail_title = Line::from(format!(" {} ", stuff.id.to_string()));
-            let detail_block = Block::bordered()
-                .title(detail_title.left_aligned())
+            let title = Line::from(title_string);
+            let block = Block::bordered()
+                .title(title.left_aligned())
                 .padding(Padding::new(1, 1, 0, 0))
                 .border_set(border::ROUNDED);
             let middle = Layout::default()
                 .direction(Direction::Vertical)
-                .constraints([
-                    Constraint::Percentage(20),
-                    Constraint::Percentage(60),
-                    Constraint::Percentage(20),
-                ])
+                .constraints(
+                    if self.detail {
+                        [
+                            Constraint::Percentage(20),
+                            Constraint::Percentage(60),
+                            Constraint::Percentage(20),
+                        ]
+                    } else {
+                        [
+                            Constraint::Min(20),
+                            Constraint::Length(3),
+                            Constraint::Min(20),
+                        ]
+                    },
+                )
                 .split(frame.area())[1];
             let middle = Layout::default()
                 .direction(Direction::Horizontal)
@@ -108,10 +137,19 @@ impl Todo {
                 ])
                 .split(middle)[1];
 
-            let paragraph = Paragraph::new(stuff.text.clone())
-                .block(detail_block);
+            let paragraph = Paragraph::new(content_string)
+                .block(block);
             frame.render_widget(Clear, middle);
             frame.render_widget(paragraph, middle);
+
+            if self.adding {
+                let width = middle.width.max(3) - 5;
+                let scroll = self.input.visual_scroll(width as usize);
+                frame.set_cursor_position((
+                    middle.x + ((self.input.visual_cursor()).max(scroll) - scroll) as u16 + 2,
+                    middle.y + 1,
+                ))
+            }
         }
     }
 
@@ -127,10 +165,29 @@ impl Todo {
     fn handle_key_event(&mut self, key_event: KeyEvent) {
         if self.detail {
             match key_event.code {
-                KeyCode::Char('s') => {
+                KeyCode::Char('s') | KeyCode::Enter | KeyCode::Esc => {
                     self.detail = false;
                 },
                 _ => {},
+            }
+        } else if self.adding {
+            match key_event.code {
+                KeyCode::Enter => {
+                    let string = self.input.value();
+                    if !string.trim().is_empty() {
+                        self.db.add_todo(self.input.value());
+                        self.update();
+                    }
+                    self.input.reset();
+                    self.adding = false;
+                },
+                KeyCode::Esc => {
+                    self.input.reset();
+                    self.adding = false;
+                },
+                _ => {
+                    self.input.handle_event(&Event::Key(key_event));
+                },
             }
         } else {
             match key_event.code {
@@ -151,20 +208,7 @@ impl Todo {
                         self.current.1 -= 1;
                     }
                 },
-                KeyCode::Char('h') => {
-                    self.current.0 = !self.current.0;
-
-                    if self.current.0 {
-                        if self.current.1 >= self.dones.len() {
-                            self.current.1 = self.dones.len().saturating_sub(1);
-                        }
-                    } else {
-                        if self.current.1 >= self.todos.len() {
-                            self.current.1 = self.todos.len().saturating_sub(1);
-                        }
-                    }
-                },
-                KeyCode::Char('l') => {
+                KeyCode::Char('h') | KeyCode::Char('l') => {
                     self.current.0 = !self.current.0;
 
                     if self.current.0 {
@@ -203,8 +247,7 @@ impl Todo {
                     self.detail = true;
                 },
                 KeyCode::Char('a') => {
-                    self.db.add_todo(&String::from("sudo rm -rf /"));
-                    self.update();
+                    self.adding = true;
                 },
                 _ => (),
             };
