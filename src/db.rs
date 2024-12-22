@@ -77,4 +77,12 @@ impl Db {
         stat.bind((1, text)).unwrap();
         stat.next().unwrap();
     }
+
+    pub fn edit_todo(&self, id: i64, text: &str) {
+        let query = "UPDATE todos SET text = ? WHERE id = ?;";
+        let mut stat = self.connection.prepare(query).unwrap();
+        stat.bind((1, text)).unwrap();
+        stat.bind((2, id)).unwrap();
+        stat.next().unwrap();
+    }
 }

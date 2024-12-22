@@ -35,6 +35,8 @@ pub struct Todo {
     dones: Vec<Stuff>,
     input: Input,
     adding: bool,
+    editing: bool,
+    editing_id: i64,
     detail: bool,
     exit: bool,
 }
@@ -48,6 +50,8 @@ impl Todo {
             dones: vec![],
             input: Input::default(),
             adding: false,
+            editing: false,
+            editing_id: 0,
             detail: false,
             exit: false,
         };
@@ -84,25 +88,28 @@ impl Todo {
     fn draw(&self, frame: &mut Frame) {
         frame.render_widget(self, frame.area());
 
-        if self.detail || self.adding {
+        if self.detail || self.adding || self.editing {
             let title_string;
             let content_string;
 
-            if self.detail {
+            if self.adding {
+                title_string = String::from(" new todo ");
+                content_string = self.input.value().to_string();
+            } else {
                 let stuff;
                 if self.current.0 {
                     stuff = &self.dones[self.current.1];
                 } else {
                     stuff = &self.todos[self.current.1];
                 }
-                title_string = format!(" {} ", stuff.id.to_string());
-                content_string = stuff.text.clone();
-            } else if self.adding {
-                title_string = String::from(" new todo ");
-                content_string = self.input.value().to_string();
-            } else {
-                title_string = String::from("");
-                content_string = String::from("");
+
+                if self.editing {
+                    title_string = format!(" {} - edit ", stuff.id.to_string());
+                    content_string = self.input.value().to_string();
+                } else {
+                    title_string = format!(" {} ", stuff.id.to_string());
+                    content_string = stuff.text.clone();
+                }
             }
 
             let title = Line::from(title_string);
@@ -121,9 +128,9 @@ impl Todo {
                         ]
                     } else {
                         [
-                            Constraint::Min(20),
+                            Constraint::Min(0),
                             Constraint::Length(3),
-                            Constraint::Min(20),
+                            Constraint::Min(0),
                         ]
                     },
                 )
@@ -142,7 +149,7 @@ impl Todo {
             frame.render_widget(Clear, middle);
             frame.render_widget(paragraph, middle);
 
-            if self.adding {
+            if self.adding || self.editing {
                 let width = middle.width.max(3) - 5;
                 let scroll = self.input.visual_scroll(width as usize);
                 frame.set_cursor_position((
@@ -184,6 +191,25 @@ impl Todo {
                 KeyCode::Esc => {
                     self.input.reset();
                     self.adding = false;
+                },
+                _ => {
+                    self.input.handle_event(&Event::Key(key_event));
+                },
+            }
+        } else if self.editing {
+            match key_event.code {
+                KeyCode::Enter => {
+                    let string = self.input.value();
+                    if !string.trim().is_empty() {
+                        self.db.edit_todo(self.editing_id, self.input.value());
+                        self.update();
+                    }
+                    self.input.reset();
+                    self.editing = false;
+                },
+                KeyCode::Esc => {
+                    self.input.reset();
+                    self.editing = false;
                 },
                 _ => {
                     self.input.handle_event(&Event::Key(key_event));
@@ -248,6 +274,22 @@ impl Todo {
                 },
                 KeyCode::Char('a') => {
                     self.adding = true;
+                },
+                KeyCode::Char('e') => {
+                    let done = self.current.0;
+                    if done {
+                        return;
+                    }
+
+                    let index = self.current.1;
+                    if self.todos.len() <= index {
+                        return;
+                    }
+
+                    let stuff = self.todos.get(index).unwrap();
+                    self.input = Input::new(stuff.text.clone());
+                    self.editing = true;
+                    self.editing_id = stuff.id;
                 },
                 _ => (),
             };
