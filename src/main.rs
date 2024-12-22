@@ -383,7 +383,7 @@ mod tests {
 
         let expected = Buffer::with_lines(vec![
             vec![Span::from("╭ todo ────╮╭ done ────╮")],
-            vec![Span::from("│"), " 1 - todo ".white().on_red(), Span::from("││ 2 - done │")],
+            vec![Span::from("│ "), "1 - todo".white().on_red(), Span::from(" ││ 2 - done │")],
             vec![Span::from("│          ││          │")],
             vec![Span::from("╰──────────╯╰──────────╯")],
         ]);
