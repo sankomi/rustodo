@@ -19,15 +19,9 @@ impl Db {
                 CREATE TABLE todos (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     done BOOLEAN DEFAULT 0,
-                    text VARCHAR(255) DEFAULT ''
+                    title VARCHAR(255) DEFAULT '',
+                    content TEXT DEFAULT ''
                 );
-                INSERT INTO todos (text, done)
-                VALUES
-                    ('do this', 0),
-                    ('be there', 0),
-                    ('stop that', 0),
-                    ('see here', 0),
-                    ('sudo rm -rf /', 1);
             ";
             connection.execute(query).unwrap();
         }
@@ -44,8 +38,9 @@ impl Db {
         while let Ok(State::Row) = stat.next() {
             let id = stat.read::<i64, _>("id").unwrap();
             let done = stat.read::<i64, _>("done").unwrap() == 1;
-            let text = stat.read::<String, _>("text").unwrap();
-            let stuff = Stuff { id, done, text };
+            let title = stat.read::<String, _>("title").unwrap();
+            let content = stat.read::<String, _>("content").unwrap();
+            let stuff = Stuff { id, done, title, content };
 
             if done {
                 dones.push(stuff);
@@ -71,18 +66,20 @@ impl Db {
         }
     }
 
-    pub fn add_todo(&self, text: &str) {
-        let query = "INSERT INTO todos (text) VALUES (?);";
+    pub fn add_todo(&self, title: &str, content: &str) {
+        let query = "INSERT INTO todos (title, content) VALUES (?, ?);";
         let mut stat = self.connection.prepare(query).unwrap();
-        stat.bind((1, text)).unwrap();
+        stat.bind((1, title)).unwrap();
+        stat.bind((2, content)).unwrap();
         stat.next().unwrap();
     }
 
-    pub fn edit_todo(&self, id: i64, text: &str) {
-        let query = "UPDATE todos SET text = ? WHERE id = ?;";
+    pub fn edit_todo(&self, id: i64, title: &str, content: &str) {
+        let query = "UPDATE todos SET title = ?, content = ? WHERE id = ?;";
         let mut stat = self.connection.prepare(query).unwrap();
-        stat.bind((1, text)).unwrap();
-        stat.bind((2, id)).unwrap();
+        stat.bind((1, title)).unwrap();
+        stat.bind((2, content)).unwrap();
+        stat.bind((3, id)).unwrap();
         stat.next().unwrap();
     }
 }
