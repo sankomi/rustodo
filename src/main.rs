@@ -101,12 +101,14 @@ impl Todo<'_> {
         frame.render_widget(self, frame.area());
 
         if self.detail || self.adding || self.editing {
+            let heading_string;
             let title_string;
             let content_string;
 
             if self.adding {
-                title_string = String::from(" new todo ");
-                content_string = self.input.value().to_string();
+                heading_string = String::from(" new todo ");
+                title_string = self.input.value().to_string();
+                content_string = String::from("");
             } else {
                 let stuff;
                 if self.current.0 {
@@ -116,36 +118,28 @@ impl Todo<'_> {
                 }
 
                 if self.editing {
-                    title_string = format!(" {} - edit ", stuff.id.to_string());
-                    content_string = self.input.value().to_string();
+                    heading_string = format!(" {} - edit ", stuff.id.to_string());
+                    title_string = self.input.value().to_string();
+                    content_string = String::from("");
                 } else {
-                    title_string = format!(" {} ", stuff.id.to_string());
-                    content_string = stuff.title.clone();
+                    heading_string = format!(" {} ", stuff.id.to_string());
+                    title_string = stuff.title.clone();
+                    content_string = stuff.content.clone();
                 }
             }
 
-            let title = Line::from(title_string);
+            let heading = Line::from(heading_string);
             let block = Block::bordered()
-                .title(title.left_aligned())
+                .title(heading.left_aligned())
                 .padding(Padding::new(1, 1, 0, 0))
                 .border_set(border::ROUNDED);
             let middle = Layout::default()
                 .direction(Direction::Vertical)
-                .constraints(
-                    if self.detail {
-                        [
-                            Constraint::Percentage(20),
-                            Constraint::Percentage(60),
-                            Constraint::Percentage(20),
-                        ]
-                    } else {
-                        [
-                            Constraint::Min(0),
-                            Constraint::Length(9),
-                            Constraint::Min(0),
-                        ]
-                    },
-                )
+                .constraints([
+                    Constraint::Percentage(20),
+                    Constraint::Percentage(60),
+                    Constraint::Percentage(20),
+                ])
                 .split(frame.area())[1];
             let middle = Layout::default()
                 .direction(Direction::Horizontal)
@@ -158,28 +152,28 @@ impl Todo<'_> {
 
             frame.render_widget(Clear, middle);
 
-            if self.adding || self.editing {
-                frame.render_widget(block, middle);
+            frame.render_widget(block, middle);
+            let inner = Layout::new(
+                Direction::Horizontal,
+                [
+                    Constraint::Length(2),
+                    Constraint::Min(0),
+                    Constraint::Length(2),
+                ],
+            ).split(middle);
+            let inner = Layout::new(
+                Direction::Vertical,
+                [
+                    Constraint::Length(1),
+                    Constraint::Length(1),
+                    Constraint::Length(1),
+                    Constraint::Min(1),
+                    Constraint::Length(1),
+                ],
+            ).split(inner[1]);
 
-                let inner = Layout::new(
-                    Direction::Horizontal,
-                    [
-                        Constraint::Length(2),
-                        Constraint::Min(0),
-                        Constraint::Length(2),
-                    ],
-                ).split(middle);
-                let inner = Layout::new(
-                    Direction::Vertical,
-                    [
-                        Constraint::Length(1),
-                        Constraint::Length(1),
-                        Constraint::Length(1),
-                        Constraint::Length(5),
-                        Constraint::Length(1),
-                    ],
-                ).split(inner[1]);
-                let paragraph = Paragraph::new(content_string);
+            if self.adding || self.editing {
+                let paragraph = Paragraph::new(title_string);
                 frame.render_widget(paragraph, inner[1]);
                 frame.render_widget(&self.textarea, inner[3]);
 
@@ -192,9 +186,10 @@ impl Todo<'_> {
                     ));
                 }
             } else {
-                let paragraph = Paragraph::new(content_string)
-                    .block(block);
-                frame.render_widget(paragraph, middle);
+                let paragraph = Paragraph::new(title_string);
+                frame.render_widget(paragraph, inner[1]);
+                let content_paragraph = Paragraph::new(content_string);
+                frame.render_widget(content_paragraph, inner[3]);
             }
         }
     }
@@ -268,20 +263,51 @@ impl Todo<'_> {
         } else if self.editing {
             match key_event.code {
                 KeyCode::Enter => {
-                    let string = self.input.value();
-                    if !string.trim().is_empty() {
-                        self.db.edit_todo(self.editing_id, self.input.value(), "");
-                        self.update();
+                    if  key_event.modifiers.contains(KeyModifiers::ALT) {
+                        let string = self.input.value();
+                        if !string.trim().is_empty() {
+                            self.db.edit_todo(
+                                self.editing_id,
+                                self.input.value(),
+                                &self.textarea.lines().join("\n"),
+                            );
+                            self.update();
+                        }
+                        self.input.reset();
+                        self.editing = false;
+                    } else if let Entering::Content = self.entering {
+                        match self.entering {
+                            Entering::Title => {
+                                self.input.handle_event(&Event::Key(key_event));
+                            },
+                            Entering::Content => {
+                                self.textarea.input(key_event);
+                            },
+                            _ => {},
+                        };
                     }
-                    self.input.reset();
-                    self.editing = false;
                 },
                 KeyCode::Esc => {
                     self.input.reset();
                     self.editing = false;
                 },
+                KeyCode::Tab => {
+                    match self.entering {
+                        Entering::Title => self.entering = Entering::Content,
+                        Entering::Content => self.entering = Entering::Title,
+                        _ => {},
+                    };
+                },
                 _ => {
-                    self.input.handle_event(&Event::Key(key_event));
+                    match self.entering {
+                        Entering::Title => {
+                            self.input.handle_event(&Event::Key(key_event));
+                        },
+                        Entering::Content => {
+                            self.textarea.input(key_event);
+                        },
+                        _ => {},
+                    };
                 },
             }
         } else {
@@ -343,6 +369,8 @@ impl Todo<'_> {
                 },
                 KeyCode::Char('a') => {
                     self.adding = true;
+                    self.textarea = TextArea::default();
+                    self.textarea.set_cursor_line_style(Style::default());
                     self.entering = Entering::Title;
                 },
                 KeyCode::Char('e') => {
@@ -358,6 +386,9 @@ impl Todo<'_> {
 
                     let stuff = self.todos.get(index).unwrap();
                     self.input = Input::new(stuff.title.clone());
+                    self.textarea = TextArea::default();
+                    self.textarea.set_cursor_line_style(Style::default());
+                    self.textarea.insert_str(stuff.content.clone());
                     self.editing = true;
                     self.editing_id = stuff.id;
                     self.entering = Entering::Title;
