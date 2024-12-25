@@ -2,7 +2,7 @@ use std::io;
 
 use ratatui::{
     buffer::Buffer,
-    crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers},
+    crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind},
     layout::{Layout, Rect, Constraint, Direction},
     style::{Stylize, Style},
     symbols::border,
@@ -106,7 +106,7 @@ impl Todo<'_> {
             let content_string;
 
             if self.adding {
-                heading_string = String::from(" new todo ");
+                heading_string = String::from(" new ");
                 title_string = self.input.value().to_string();
                 content_string = String::from("");
             } else {
@@ -206,95 +206,92 @@ impl Todo<'_> {
     fn handle_key_event(&mut self, key_event: KeyEvent) {
         if self.detail {
             match key_event.code {
-                KeyCode::Char('s') | KeyCode::Enter | KeyCode::Esc => {
+                KeyCode::Enter | KeyCode::Esc => {
                     self.detail = false;
+                },
+                KeyCode::Char('a') => {
+                    if self.current.0 {
+                        return;
+                    }
+
+                    self.detail = false;
+
+                    let index = self.current.1;
+                    let stuff = self.todos.get(index).unwrap();
+                    self.input = Input::new(stuff.title.clone());
+                    self.textarea = TextArea::default();
+                    self.textarea.set_cursor_line_style(Style::default());
+                    self.textarea.insert_str(stuff.content.clone());
+                    self.editing = true;
+                    self.editing_id = stuff.id;
+                    self.entering = Entering::Title;
+                },
+                KeyCode::Char('d') => {
+                    self.detail = false;
+
+                    let done = self.current.0;
+                    let index = self.current.1;
+
+                    let stuff;
+                    if done {
+                        if self.dones.len() > index {
+                            stuff = self.dones.get(index).unwrap();
+                        } else {
+                            return;
+                        }
+                    } else {
+                        if self.todos.len() > index {
+                            stuff = self.todos.get(index).unwrap();
+                        } else {
+                            return;
+                        }
+                    }
+
+                    self.db.flip(stuff.id);
+                    self.update();
                 },
                 _ => {},
             }
-        } else if self.adding {
+        } else if self.adding || self.editing {
             match key_event.code {
-                KeyCode::Enter => {
-                    if  key_event.modifiers.contains(KeyModifiers::ALT) {
-                        let string = self.input.value();
-                        if !string.trim().is_empty() {
+                KeyCode::Esc => {
+                    let string = self.input.value();
+                    if !string.trim().is_empty() {
+                        if self.adding {
                             self.db.add_todo(
                                 self.input.value(),
                                 &self.textarea.lines().join("\n"),
                             );
-                            self.update();
-                        }
-                        self.input.reset();
-                        self.adding = false;
-                    } else if let Entering::Content = self.entering {
-                        match self.entering {
-                            Entering::Title => {
-                                self.input.handle_event(&Event::Key(key_event));
-                            },
-                            Entering::Content => {
-                                self.textarea.input(key_event);
-                            },
-                            _ => {},
-                        };
-                    }
-                },
-                KeyCode::Esc => {
-                    self.input.reset();
-                    self.adding = false;
-                },
-                KeyCode::Tab => {
-                    match self.entering {
-                        Entering::Title => self.entering = Entering::Content,
-                        Entering::Content => self.entering = Entering::Title,
-                        _ => {},
-                    };
-                },
-                _ => {
-                    match self.entering {
-                        Entering::Title => {
-                            self.input.handle_event(&Event::Key(key_event));
-                        },
-                        Entering::Content => {
-                            self.textarea.input(key_event);
-                        },
-                        _ => {},
-                    };
-                },
-            }
-        } else if self.editing {
-            match key_event.code {
-                KeyCode::Enter => {
-                    if  key_event.modifiers.contains(KeyModifiers::ALT) {
-                        let string = self.input.value();
-                        if !string.trim().is_empty() {
+
+                            self.current.0 = false;
+                            self.current.1 = self.todos.len() + 1;
+                        } else if self.editing {
                             self.db.edit_todo(
                                 self.editing_id,
                                 self.input.value(),
                                 &self.textarea.lines().join("\n"),
                             );
-                            self.update();
                         }
-                        self.input.reset();
-                        self.editing = false;
-                    } else if let Entering::Content = self.entering {
-                        match self.entering {
-                            Entering::Title => {
-                                self.input.handle_event(&Event::Key(key_event));
-                            },
-                            Entering::Content => {
-                                self.textarea.input(key_event);
-                            },
-                            _ => {},
-                        };
+                        self.update();
                     }
-                },
-                KeyCode::Esc => {
                     self.input.reset();
+                    self.adding = false;
                     self.editing = false;
+                    self.detail = true;
                 },
                 KeyCode::Tab => {
                     match self.entering {
                         Entering::Title => self.entering = Entering::Content,
                         Entering::Content => self.entering = Entering::Title,
+                        _ => {},
+                    };
+                },
+                KeyCode::Enter => {
+                    match self.entering {
+                        Entering::Title => self.entering = Entering::Content,
+                        Entering::Content => {
+                            self.textarea.input(key_event);
+                        },
                         _ => {},
                     };
                 },
@@ -312,7 +309,7 @@ impl Todo<'_> {
             }
         } else {
             match key_event.code {
-                KeyCode::Char('q') => self.exit(),
+                KeyCode::Esc => self.exit(),
                 KeyCode::Char('j') => {
                     if self.current.0 {
                         if self.current.1 < self.dones.len().saturating_sub(1) {
@@ -325,9 +322,7 @@ impl Todo<'_> {
                     }
                 },
                 KeyCode::Char('k') => {
-                    if self.current.1 > 0 {
-                        self.current.1 -= 1;
-                    }
+                    self.current.1 = self.current.1.saturating_sub(1);
                 },
                 KeyCode::Char('h') | KeyCode::Char('l') => {
                     self.current.0 = !self.current.0;
@@ -364,33 +359,17 @@ impl Todo<'_> {
                     self.db.flip(stuff.id);
                     self.update();
                 },
-                KeyCode::Char('s') => {
-                    self.detail = true;
+                KeyCode::Enter => {
+                    self.detail = if self.current.0 {
+                        self.current.1 < self.dones.len()
+                    } else {
+                        self.current.1 < self.todos.len()
+                    };
                 },
                 KeyCode::Char('a') => {
                     self.adding = true;
                     self.textarea = TextArea::default();
                     self.textarea.set_cursor_line_style(Style::default());
-                    self.entering = Entering::Title;
-                },
-                KeyCode::Char('e') => {
-                    let done = self.current.0;
-                    if done {
-                        return;
-                    }
-
-                    let index = self.current.1;
-                    if self.todos.len() <= index {
-                        return;
-                    }
-
-                    let stuff = self.todos.get(index).unwrap();
-                    self.input = Input::new(stuff.title.clone());
-                    self.textarea = TextArea::default();
-                    self.textarea.set_cursor_line_style(Style::default());
-                    self.textarea.insert_str(stuff.content.clone());
-                    self.editing = true;
-                    self.editing_id = stuff.id;
                     self.entering = Entering::Title;
                 },
                 _ => (),
@@ -459,7 +438,6 @@ impl Widget for &Todo<'_> {
 #[derive(Debug)]
 pub struct Stuff {
     id: i64,
-    done: bool,
     title: String,
     content: String,
 }
@@ -474,10 +452,10 @@ mod tests {
     fn test_render() {
         let mut todo = Todo::new();
         todo.todos = vec![
-            Stuff { id: 1, done: false, title: String::from("todo"), content: String::from("") },
+            Stuff { id: 1, title: String::from("todo"), content: String::from("") },
         ];
         todo.dones = vec![
-            Stuff { id: 2, done: true, title: String::from("done"), content: String::from("") },
+            Stuff { id: 2, title: String::from("done"), content: String::from("") },
         ];
 
         let mut buf = Buffer::empty(Rect::new(0, 0, 24, 4));
@@ -497,7 +475,7 @@ mod tests {
     #[test]
     fn test_handle_key_event() {
         let mut todo = Todo::new();
-        todo.handle_key_event(KeyCode::Char('q').into());
+        todo.handle_key_event(KeyCode::Enter.into());
         assert!(todo.exit);
     }
 }

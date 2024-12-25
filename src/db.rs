@@ -40,7 +40,7 @@ impl Db {
             let done = stat.read::<i64, _>("done").unwrap() == 1;
             let title = stat.read::<String, _>("title").unwrap();
             let content = stat.read::<String, _>("content").unwrap();
-            let stuff = Stuff { id, done, title, content };
+            let stuff = Stuff { id, title, content };
 
             if done {
                 dones.push(stuff);
