@@ -8,6 +8,8 @@ use ratatui::{
     DefaultTerminal, Frame,
 };
 
+use crate::db::Db;
+
 pub struct Todo {
     pub exit: bool,
 }
