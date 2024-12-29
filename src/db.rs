@@ -8,7 +8,11 @@ pub struct Db {
 
 impl Db {
     pub fn new() -> Self {
+        #[cfg(not(test))]
         let file = "sqlite.db";
+        #[cfg(test)]
+        let file = "test.db";
+
         let exists = Path::new(file).exists();
         let connection = sqlite::open(file).unwrap();
         let db = Db { connection };
@@ -79,4 +83,48 @@ struct Task {
     subject: String,
     body: String,
     created: String,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_insert_one() {
+        let subject = "test_subject";
+        let body = "test_body";
+
+        let db = Db::new();
+        let insert = db.insert_one(subject, body);
+        if let Some(task) = insert {
+            assert_eq!(task.subject, subject);
+            assert_eq!(task.body, body);
+        } else {
+            assert!(false, "failed to insert task!");
+        }
+    }
+
+    #[test]
+    fn test_insert_then_get_one() {
+        let id;
+        let subject = "test_subject";
+        let body = "test_body";
+
+        let db = Db::new();
+        let insert = db.insert_one(subject, body);
+        if let Some(task) = insert {
+            id = task.id;
+        } else {
+            assert!(false, "failed to insert task!");
+            return;
+        }
+
+        let get = db.get_one(id);
+        if let Some(task) = get {
+            assert_eq!(task.subject, subject);
+            assert_eq!(task.body, body);
+        } else {
+            assert!(false, "failed to get task!");
+        }
+    }
 }
