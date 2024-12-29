@@ -4,19 +4,30 @@ use ratatui::{
     buffer::Buffer,
     crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind},
     layout::Rect,
+    text::Line,
     widgets::{Paragraph, Widget},
     DefaultTerminal, Frame,
 };
 
-use crate::db::Db;
+use crate::db::{Db, Task};
 
 pub struct Todo {
-    pub exit: bool,
+    db: Db,
+    tasks: Vec<Task>,
+    exit: bool,
 }
 
 impl Todo {
     pub fn new() -> Self {
-        Self { exit: false }
+        let mut db = Self {
+            db: Db::new(),
+            tasks: vec![],
+            exit: false,
+        };
+
+        db.update();
+
+        db
     }
 
     pub fn run(&mut self, mut terminal: DefaultTerminal) -> io::Result<()> {
@@ -53,11 +64,20 @@ impl Todo {
             _ => (),
         };
     }
+
+    fn update(&mut self) {
+        self.tasks = self.db.list();
+    }
 }
 
 impl Widget for &Todo {
     fn render(self, area: Rect, buf: &mut Buffer) {
-        Paragraph::new("here be dragons!").render(area, buf);
+        let lines: Vec<_> = self
+            .tasks
+            .iter()
+            .map(|task| Line::from(task.subject.clone()))
+            .collect();
+        Paragraph::new(lines).render(area, buf);
     }
 }
 
@@ -67,12 +87,19 @@ mod tests {
 
     #[test]
     fn test_render() {
-        let todo = Todo::new();
+        let mut todo = Todo::new();
+        todo.tasks = vec![Task {
+            id: 1,
+            done: false,
+            subject: String::from("test_subject"),
+            body: String::from("test_body"),
+            created: String::from("2024-12-29 14:00:00"),
+        }];
         let mut buf = Buffer::empty(Rect::new(0, 0, 20, 4));
         todo.render(buf.area, &mut buf);
 
         let expected = Buffer::with_lines(vec![
-            "here be dragons!    ",
+            "test_subject        ",
             "                    ",
             "                    ",
             "                    ",

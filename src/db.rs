@@ -1,6 +1,14 @@
 use std::path::Path;
 
-use sqlite::{State, Connection};
+use sqlite::{Connection, State};
+
+pub struct Task {
+    pub id: i64,
+    pub done: bool,
+    pub subject: String,
+    pub body: String,
+    pub created: String,
+}
 
 pub struct Db {
     connection: Connection,
@@ -37,7 +45,7 @@ impl Db {
         self.connection.execute(sql).unwrap();
     }
 
-    fn insert_one(&self, subject: &str, body: &str) -> Option<Task> {
+    pub fn insert_one(&self, subject: &str, body: &str) -> Option<Task> {
         let sql = "
             INSERT INTO tasks (subject, body)
             VALUES (?, ?)
@@ -59,7 +67,7 @@ impl Db {
         None
     }
 
-    fn get_one(&self, id: i64) -> Option<Task> {
+    pub fn get_one(&self, id: i64) -> Option<Task> {
         let sql = "SELECT * FROM tasks WHERE id = ?";
         let mut stat = self.connection.prepare(sql).unwrap();
         stat.bind((1, id)).unwrap();
@@ -75,14 +83,25 @@ impl Db {
 
         None
     }
-}
 
-struct Task {
-    id: i64,
-    done: bool,
-    subject: String,
-    body: String,
-    created: String,
+    pub fn list(&self) -> Vec<Task> {
+        let mut tasks = vec![];
+
+        let sql = "SELECT * FROM tasks;";
+        let mut stat = self.connection.prepare(sql).unwrap();
+        while let Ok(State::Row) = stat.next() {
+            let task = Task {
+                id: stat.read::<i64, _>("id").unwrap(),
+                done: stat.read::<i64, _>("done").unwrap() == 1,
+                subject: stat.read::<String, _>("subject").unwrap(),
+                body: stat.read::<String, _>("body").unwrap(),
+                created: stat.read::<String, _>("created").unwrap(),
+            };
+            tasks.push(task);
+        }
+
+        tasks
+    }
 }
 
 #[cfg(test)]
