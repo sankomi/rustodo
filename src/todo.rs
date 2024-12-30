@@ -9,18 +9,23 @@ use ratatui::{
     DefaultTerminal, Frame,
 };
 
-use crate::db::{Db, Task};
+use crate::{
+    db::{Db, Task},
+    editor::Editor,
+};
 
-pub struct Todo {
+pub struct Todo<'a> {
     db: Db,
+    editor: Editor<'a>,
     tasks: Vec<Task>,
     exit: bool,
 }
 
-impl Todo {
+impl Todo<'_> {
     pub fn new() -> Self {
         let mut db = Self {
             db: Db::new(),
+            editor: Editor::new(),
             tasks: vec![],
             exit: false,
         };
@@ -41,13 +46,17 @@ impl Todo {
 
     fn draw(&self, frame: &mut Frame) {
         frame.render_widget(self, frame.area());
+        frame.render_widget(&self.editor, frame.area());
     }
 
     fn handle_events(&mut self) -> io::Result<()> {
         match event::read()? {
             Event::Key(key_event) => {
                 if key_event.kind == KeyEventKind::Press {
-                    self.handle_key_press_event(key_event);
+                    let handled = self.editor.handle_key_press_event(key_event);
+                    if !handled {
+                        self.handle_key_press_event(key_event);
+                    }
                 }
             }
             _ => (),
@@ -61,6 +70,9 @@ impl Todo {
             KeyCode::Esc => {
                 self.exit = true;
             }
+            KeyCode::Enter => {
+                self.editor.start(|text| println!("{}", text));
+            }
             _ => (),
         };
     }
@@ -70,7 +82,7 @@ impl Todo {
     }
 }
 
-impl Widget for &Todo {
+impl Widget for &Todo<'_> {
     fn render(self, area: Rect, buf: &mut Buffer) {
         let lines: Vec<_> = self
             .tasks
