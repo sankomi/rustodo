@@ -18,6 +18,7 @@ pub struct Todo<'a> {
     db: Db,
     editor: Editor<'a>,
     tasks: Vec<Task>,
+    current: usize,
     exit: bool,
 }
 
@@ -27,6 +28,7 @@ impl Todo<'_> {
             db: Db::new(),
             editor: Editor::new(),
             tasks: vec![],
+            current: 0,
             exit: false,
         };
 
@@ -71,7 +73,13 @@ impl Todo<'_> {
                 self.exit = true;
             }
             KeyCode::Enter => {
-                self.editor.start(|text| println!("{}", text));
+                if let Some(task) = self.tasks.get(self.current) {
+                    let subject = task.subject.clone();
+                    let body = task.body.clone();
+                    self.editor.start(subject, body, |subject, body| {
+                        //println!("{}, {}", subject, body);
+                    });
+                }
             }
             _ => (),
         };

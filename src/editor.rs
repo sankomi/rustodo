@@ -2,7 +2,7 @@ use ratatui::{
     buffer::Buffer,
     crossterm::event::{KeyCode, KeyEvent},
     layout::Rect,
-    widgets::Widget,
+    widgets::{Clear, Widget},
 };
 use tui_textarea::TextArea;
 
@@ -15,7 +15,7 @@ enum EditorStatus {
 pub struct Editor<'a> {
     status: EditorStatus,
     textarea: TextArea<'a>,
-    on_done: fn(&str) -> (),
+    on_done: fn(String, String) -> (),
 }
 
 impl Editor<'_> {
@@ -23,7 +23,7 @@ impl Editor<'_> {
         Self {
             status: EditorStatus::Hiding,
             textarea: TextArea::default(),
-            on_done: |_| (),
+            on_done: |_, _| (),
         }
     }
 
@@ -31,7 +31,7 @@ impl Editor<'_> {
         match self.status {
             EditorStatus::Editing => {
                 match key_event.code {
-                    KeyCode::Esc => self.view(true),
+                    KeyCode::Esc => self.done(),
                     _ => drop(self.textarea.input(key_event)),
                 };
 
@@ -51,17 +51,50 @@ impl Editor<'_> {
         false
     }
 
-    pub fn start(&mut self, on_done: fn(&str) -> ()) {
+    pub fn start(&mut self, subject: String, body: String, on_done: fn(String, String) -> ()) {
+        let text = format!("{}\n\n{}", subject, body);
+        self.textarea = TextArea::default();
+        self.textarea.insert_str(text);
         self.on_done = on_done;
-        self.view(false);
+        self.view();
     }
 
-    fn view(&mut self, done: bool) {
-        if done {
-            let text = self.textarea.lines().join("\n");
-            (self.on_done)(&text);
-        }
+    fn done(&mut self) {
+        let mut not_blank = 0;
+        let lines = self
+            .textarea
+            .lines()
+            .iter()
+            .filter(|line| {
+                if not_blank > 1 {
+                    true
+                } else if *line != "" {
+                    not_blank += 1;
+                    true
+                } else {
+                    false
+                }
+            })
+            .map(|line| line.clone())
+            .collect::<Vec<_>>();
+        let subject = lines[0].clone();
+        let mut not_blank = false;
+        let body = lines[1..]
+            .iter()
+            .filter(|line| {
+                not_blank = not_blank || *line != "";
+                not_blank
+            })
+            .map(|line| line.clone())
+            .collect::<Vec<_>>()
+            .join("\n")
+            .clone();
 
+        self.view();
+        (self.on_done)(subject, body);
+    }
+
+    fn view(&mut self) {
         self.status = EditorStatus::Viewing;
     }
 
@@ -80,6 +113,7 @@ impl Widget for &Editor<'_> {
             return;
         }
 
+        Clear.render(area, buf);
         self.textarea.render(area, buf);
     }
 }
