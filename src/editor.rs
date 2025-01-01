@@ -59,7 +59,7 @@ impl Editor<'_> {
         self.content.take()
     }
 
-    pub fn start(&mut self, subject: String, body: String) {
+    pub fn start(&mut self, subject: &str, body: &str) {
         let text = format!("{}\n\n{}", subject, body);
         self.textarea = TextArea::default();
         self.textarea.insert_str(text);
@@ -97,8 +97,8 @@ impl Editor<'_> {
             .join("\n")
             .clone();
 
+        self.start(&subject, &body);
         self.content = Some(Content { subject, body });
-        self.view();
     }
 
     fn view(&mut self) {

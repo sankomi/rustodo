@@ -77,9 +77,7 @@ impl Todo<'_> {
             }
             KeyCode::Enter => {
                 if let Some(task) = self.tasks.get(self.current) {
-                    let subject = task.subject.clone();
-                    let body = task.body.clone();
-                    self.editor.start(subject, body);
+                    self.editor.start(&task.subject, &task.body);
                 }
             }
             _ => (),
