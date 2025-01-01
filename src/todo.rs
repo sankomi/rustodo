@@ -11,7 +11,7 @@ use ratatui::{
 
 use crate::{
     db::{Db, Task},
-    editor::Editor,
+    editor::{Content, Editor},
 };
 
 pub struct Todo<'a> {
@@ -55,8 +55,11 @@ impl Todo<'_> {
         match event::read()? {
             Event::Key(key_event) => {
                 if key_event.kind == KeyEventKind::Press {
-                    let handled = self.editor.handle_key_press_event(key_event);
-                    if !handled {
+                    if self.editor.handle_key_press_event(key_event) {
+                        if let Some(content) = self.editor.get_content() {
+                            self.update_current(content);
+                        }
+                    } else {
                         self.handle_key_press_event(key_event);
                     }
                 }
@@ -76,13 +79,20 @@ impl Todo<'_> {
                 if let Some(task) = self.tasks.get(self.current) {
                     let subject = task.subject.clone();
                     let body = task.body.clone();
-                    self.editor.start(subject, body, |subject, body| {
-                        //println!("{}, {}", subject, body);
-                    });
+                    self.editor.start(subject, body);
                 }
             }
             _ => (),
         };
+    }
+
+    fn update_current(&mut self, content: Content) {
+        if let Some(task) = self.tasks.get_mut(self.current) {
+            task.subject = content.subject;
+            task.body = content.body;
+            self.db.update_one(task);
+            self.update();
+        }
     }
 
     fn update(&mut self) {

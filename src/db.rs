@@ -84,6 +84,33 @@ impl Db {
         None
     }
 
+    pub fn update_one(&self, task: &Task) -> Option<Task> {
+        let sql = "
+            UPDATE tasks
+            SET done = :done,
+                subject = :subject,
+                body = :body
+            WHERE id = :id
+            RETURNING *;
+        ";
+        let mut stat = self.connection.prepare(sql).unwrap();
+        stat.bind((":id", task.id)).unwrap();
+        stat.bind((":done", if task.done { 1 } else { 0 })).unwrap();
+        stat.bind((":subject", task.subject.as_str())).unwrap();
+        stat.bind((":body", task.body.as_str())).unwrap();
+        while let Ok(State::Row) = stat.next() {
+            return Some(Task {
+                id: stat.read::<i64, _>("id").unwrap(),
+                done: stat.read::<i64, _>("done").unwrap() == 1,
+                subject: stat.read::<String, _>("subject").unwrap(),
+                body: stat.read::<String, _>("body").unwrap(),
+                created: stat.read::<String, _>("created").unwrap(),
+            });
+        }
+
+        None
+    }
+
     pub fn list(&self) -> Vec<Task> {
         let mut tasks = vec![];
 

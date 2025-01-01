@@ -12,10 +12,15 @@ enum EditorStatus {
     Editing,
 }
 
+pub struct Content {
+    pub subject: String,
+    pub body: String,
+}
+
 pub struct Editor<'a> {
     status: EditorStatus,
     textarea: TextArea<'a>,
-    on_done: fn(String, String) -> (),
+    content: Option<Content>,
 }
 
 impl Editor<'_> {
@@ -23,7 +28,7 @@ impl Editor<'_> {
         Self {
             status: EditorStatus::Hiding,
             textarea: TextArea::default(),
-            on_done: |_, _| (),
+            content: None,
         }
     }
 
@@ -34,7 +39,6 @@ impl Editor<'_> {
                     KeyCode::Esc => self.done(),
                     _ => drop(self.textarea.input(key_event)),
                 };
-
                 return true;
             }
             EditorStatus::Viewing => {
@@ -51,11 +55,14 @@ impl Editor<'_> {
         false
     }
 
-    pub fn start(&mut self, subject: String, body: String, on_done: fn(String, String) -> ()) {
+    pub fn get_content(&mut self) -> Option<Content> {
+        self.content.take()
+    }
+
+    pub fn start(&mut self, subject: String, body: String) {
         let text = format!("{}\n\n{}", subject, body);
         self.textarea = TextArea::default();
         self.textarea.insert_str(text);
-        self.on_done = on_done;
         self.view();
     }
 
@@ -90,8 +97,8 @@ impl Editor<'_> {
             .join("\n")
             .clone();
 
+        self.content = Some(Content { subject, body });
         self.view();
-        (self.on_done)(subject, body);
     }
 
     fn view(&mut self) {
