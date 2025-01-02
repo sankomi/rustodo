@@ -4,6 +4,7 @@ use ratatui::{
     buffer::Buffer,
     crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind},
     layout::Rect,
+    style::Stylize,
     text::Line,
     widgets::{Paragraph, Widget},
     DefaultTerminal, Frame,
@@ -80,6 +81,14 @@ impl Todo<'_> {
                     self.editor.start(&task.subject, &task.body);
                 }
             }
+            KeyCode::Char('k') | KeyCode::Up => {
+                self.current = self.current.saturating_sub(1);
+            }
+            KeyCode::Char('j') | KeyCode::Down => {
+                if self.current < self.tasks.len() - 1 {
+                    self.current += 1;
+                }
+            }
             _ => (),
         };
     }
@@ -95,6 +104,10 @@ impl Todo<'_> {
 
     fn update(&mut self) {
         self.tasks = self.db.list();
+
+        if self.current >= self.tasks.len() {
+            self.current = self.tasks.len().saturating_sub(1);
+        }
     }
 }
 
@@ -103,7 +116,15 @@ impl Widget for &Todo<'_> {
         let lines: Vec<_> = self
             .tasks
             .iter()
-            .map(|task| Line::from(task.subject.clone()))
+            .enumerate()
+            .map(|(i, task)| {
+                if i == self.current {
+                    let string = format!("{:<width$}", task.subject, width = area.width.into());
+                    Line::from(string.white().on_red())
+                } else {
+                    Line::from(task.subject.clone())
+                }
+            })
             .collect();
         Paragraph::new(lines).render(area, buf);
     }
