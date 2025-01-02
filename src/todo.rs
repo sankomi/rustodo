@@ -148,10 +148,10 @@ mod tests {
         todo.render(buf.area, &mut buf);
 
         let expected = Buffer::with_lines(vec![
-            "test_subject        ",
-            "                    ",
-            "                    ",
-            "                    ",
+            "test_subject        ".white().on_red(),
+            "                    ".into(),
+            "                    ".into(),
+            "                    ".into(),
         ]);
 
         assert_eq!(buf, expected);

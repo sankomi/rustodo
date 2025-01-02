@@ -173,4 +173,32 @@ mod tests {
             assert!(false, "failed to get task!");
         }
     }
+
+    #[test]
+    fn test_insert_then_update_one() {
+        let subject = "test_subject";
+        let body = "test_body";
+        let new_subject = "new_test_subject";
+        let new_body = "new_test_body";
+
+        let db = Db::new();
+        let insert = db.insert_one(subject, body);
+        let mut inserted;
+        if let Some(task) = insert {
+            inserted = task;
+        } else {
+            assert!(false, "failed to insert task!");
+            return;
+        }
+
+        inserted.subject = new_subject.to_string();
+        inserted.body = new_body.to_string();
+        let update = db.update_one(&inserted);
+        if let Some(task) = update {
+            assert_eq!(task.subject, new_subject);
+            assert_eq!(task.body, new_body);
+        } else {
+            assert!(false, "failed to update task!");
+        }
+    }
 }
