@@ -1,4 +1,6 @@
 use std::io;
+use std::cell::RefCell;
+use std::cmp;
 
 use ratatui::{
     buffer::Buffer,
@@ -15,27 +17,36 @@ use crate::{
     editor::{Content, Editor},
 };
 
+enum Direction {
+    Up,
+    Down,
+}
+
 pub struct Todo<'a> {
     db: Db,
     editor: Editor<'a>,
     tasks: Vec<Task>,
     current: usize,
+    direction: Direction,
+    scroll: RefCell<usize>,
     exit: bool,
 }
 
 impl Todo<'_> {
     pub fn new() -> Self {
-        let mut db = Self {
+        let mut todo = Self {
             db: Db::new(),
             editor: Editor::new(),
             tasks: vec![],
             current: 0,
+            direction: Direction::Down,
+            scroll: RefCell::new(0),
             exit: false,
         };
 
-        db.update();
+        todo.update();
 
-        db
+        todo
     }
 
     pub fn run(&mut self, mut terminal: DefaultTerminal) -> io::Result<()> {
@@ -83,11 +94,13 @@ impl Todo<'_> {
             }
             KeyCode::Char('k') | KeyCode::Up => {
                 self.current = self.current.saturating_sub(1);
+                self.direction = Direction::Up;
             }
             KeyCode::Char('j') | KeyCode::Down => {
                 if self.current < self.tasks.len() - 1 {
                     self.current += 1;
                 }
+                self.direction = Direction::Down;
             }
             _ => (),
         };
@@ -113,12 +126,42 @@ impl Todo<'_> {
 
 impl Widget for &Todo<'_> {
     fn render(self, area: Rect, buf: &mut Buffer) {
+        let len = self.tasks.len();
+        let height = area.height as usize;
+        let mut scroll = self.scroll.borrow_mut();
+        *scroll = if len <= height {
+            0
+        } else {
+            match self.direction {
+                Direction::Up => {
+                    if self.current < *scroll {
+                        self.current
+                    } else if self.current >= *scroll + height {
+                        self.current - height + 1
+                    } else {
+                        *scroll
+                    }
+                }
+                Direction::Down => {
+                    if self.current < *scroll + height {
+                        *scroll
+                    } else if self.current >= height {
+                        self.current - height + 1
+                    } else {
+                        *scroll
+                    }
+                }
+            }
+        };
+
+        let from = cmp::min(*scroll, len - 1);
+        let to = cmp::min(*scroll + height, len);
         let lines: Vec<_> = self
-            .tasks
+            .tasks[from..to]
             .iter()
             .enumerate()
             .map(|(i, task)| {
-                if i == self.current {
+                if i == self.current - *scroll {
                     let string = format!("{:<width$}", task.subject, width = area.width.into());
                     Line::from(string.white().on_red())
                 } else {
