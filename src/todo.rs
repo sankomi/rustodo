@@ -97,7 +97,7 @@ impl Todo<'_> {
                 self.direction = Direction::Up;
             }
             KeyCode::Char('j') | KeyCode::Down => {
-                if self.current < self.tasks.len() - 1 {
+                if self.current < self.tasks.len().saturating_sub(1) {
                     self.current += 1;
                 }
                 self.direction = Direction::Down;
@@ -154,7 +154,7 @@ impl Widget for &Todo<'_> {
             }
         };
 
-        let from = cmp::min(*scroll, len - 1);
+        let from = cmp::min(*scroll, len.saturating_sub(1));
         let to = cmp::min(*scroll + height, len);
         let lines: Vec<_> = self
             .tasks[from..to]
