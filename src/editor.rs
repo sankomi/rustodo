@@ -60,7 +60,11 @@ impl Editor<'_> {
     }
 
     pub fn start(&mut self, subject: &str, body: &str) {
-        let text = format!("{}\n\n{}", subject, body);
+        let text = if body == "" {
+            String::from(subject)
+        } else {
+            format!("{}\n\n{}", subject, body)
+        };
         self.textarea = TextArea::default();
         self.textarea.insert_str(text);
         self.view();
@@ -75,7 +79,7 @@ impl Editor<'_> {
             .filter(|line| {
                 if not_blank > 1 {
                     true
-                } else if *line != "" {
+                } else if !line.trim().is_empty() {
                     not_blank += 1;
                     true
                 } else {
@@ -84,18 +88,23 @@ impl Editor<'_> {
             })
             .map(|line| line.clone())
             .collect::<Vec<_>>();
-        let subject = lines[0].clone();
-        let mut not_blank = false;
-        let body = lines[1..]
-            .iter()
-            .filter(|line| {
-                not_blank = not_blank || *line != "";
-                not_blank
-            })
-            .map(|line| line.clone())
-            .collect::<Vec<_>>()
-            .join("\n")
-            .clone();
+
+        let subject = if let Some(line) = lines.get(0) {
+            line.clone()
+        } else {
+            String::from("(no subject)")
+        };
+
+        let body = if let Some(lines) = lines.get(1..) {
+            lines
+                .iter()
+                .map(|line| line.clone())
+                .collect::<Vec<_>>()
+                .join("\n")
+                .clone()
+        } else {
+            String::from("")
+        };
 
         self.start(&subject, &body);
         self.content = Some(Content { subject, body });
