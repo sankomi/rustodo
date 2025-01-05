@@ -22,6 +22,12 @@ enum Direction {
     Down,
 }
 
+enum EditType {
+    Editing,
+    Adding,
+    Done,
+}
+
 pub struct Todo<'a> {
     db: Db,
     editor: Editor<'a>,
@@ -29,6 +35,7 @@ pub struct Todo<'a> {
     current: usize,
     direction: Direction,
     scroll: RefCell<usize>,
+    edit_type: EditType,
     exit: bool,
 }
 
@@ -41,6 +48,7 @@ impl Todo<'_> {
             current: 0,
             direction: Direction::Down,
             scroll: RefCell::new(0),
+            edit_type: EditType::Done,
             exit: false,
         };
 
@@ -69,7 +77,16 @@ impl Todo<'_> {
                 if key_event.kind == KeyEventKind::Press {
                     if self.editor.handle_key_press_event(key_event) {
                         if let Some(content) = self.editor.get_content() {
-                            self.update_current(content);
+                            match self.edit_type {
+                                EditType::Editing => {
+                                    self.update_current(content);
+                                }
+                                EditType::Adding => {
+                                    self.add_task(content);
+                                }
+                                _ => (),
+                            }
+                            self.edit_type = EditType::Done;
                         }
                     } else {
                         self.handle_key_press_event(key_event);
@@ -89,6 +106,7 @@ impl Todo<'_> {
             }
             KeyCode::Enter => {
                 if let Some(task) = self.tasks.get(self.current) {
+                    self.edit_type = EditType::Editing;
                     self.editor.start(&task.subject, &task.body);
                 }
             }
@@ -102,6 +120,10 @@ impl Todo<'_> {
                 }
                 self.direction = Direction::Down;
             }
+            KeyCode::Char('+') | KeyCode::Char('a') => {
+                self.edit_type = EditType::Adding;
+                self.editor.start("", "");
+            }
             _ => (),
         };
     }
@@ -112,6 +134,13 @@ impl Todo<'_> {
             task.body = content.body;
             self.db.update_one(task);
             self.update();
+        }
+    }
+
+    fn add_task(&mut self, content: Content) {
+        if let Some(task) = self.db.insert_one(&content.subject, &content.body) {
+            self.update();
+            self.current = self.tasks.len().saturating_sub(1);
         }
     }
 
