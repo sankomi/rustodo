@@ -1,6 +1,7 @@
-use std::io;
 use std::cell::RefCell;
 use std::cmp;
+use std::io;
+use std::mem;
 
 use ratatui::{
     buffer::Buffer,
@@ -110,9 +111,15 @@ impl Todo<'_> {
                     self.editor.start(&task.subject, &task.body);
                 }
             }
+            KeyCode::Char('K') => {
+                self.switch(Direction::Up);
+            }
             KeyCode::Char('k') | KeyCode::Up => {
                 self.current = self.current.saturating_sub(1);
                 self.direction = Direction::Up;
+            }
+            KeyCode::Char('J') => {
+                self.switch(Direction::Down);
             }
             KeyCode::Char('j') | KeyCode::Down => {
                 if self.current < self.tasks.len().saturating_sub(1) {
@@ -138,9 +145,27 @@ impl Todo<'_> {
     }
 
     fn add_task(&mut self, content: Content) {
-        if let Some(task) = self.db.insert_one(&content.subject, &content.body) {
+        if let Some(_) = self.db.insert_one(&content.subject, &content.body) {
             self.update();
             self.current = self.tasks.len().saturating_sub(1);
+        }
+    }
+
+    fn switch(&mut self, direction: Direction) {
+        if let Some(current) = self.tasks.get_mut(self.current) {
+            if let Some(mut next) = match direction {
+                Direction::Up => self.db.get_one(current.id.saturating_sub(1)),
+                Direction::Down => self.db.get_one(current.id + 1),
+            } {
+                mem::swap(&mut current.id, &mut next.id);
+                self.db.update_one(&current);
+                self.db.update_one(&next);
+                self.current = match direction {
+                    Direction::Up => self.current.saturating_sub(1),
+                    Direction::Down => self.current + 1,
+                };
+                self.update();
+            }
         }
     }
 
@@ -185,8 +210,7 @@ impl Widget for &Todo<'_> {
 
         let from = cmp::min(*scroll, len.saturating_sub(1));
         let to = cmp::min(*scroll + height, len);
-        let lines: Vec<_> = self
-            .tasks[from..to]
+        let lines: Vec<_> = self.tasks[from..to]
             .iter()
             .enumerate()
             .map(|(i, task)| {
