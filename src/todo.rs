@@ -5,11 +5,11 @@ use std::mem;
 
 use ratatui::{
     buffer::Buffer,
-    crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind},
+    crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers},
     layout::Rect,
     style::Stylize,
     text::Line,
-    widgets::{Paragraph, Widget},
+    widgets::{Block, Borders, Paragraph, Widget},
     DefaultTerminal, Frame,
 };
 
@@ -111,19 +111,21 @@ impl Todo<'_> {
                     self.editor.start(&task.subject, &task.body);
                 }
             }
-            KeyCode::Char('K') => {
-                self.switch(Direction::Up);
-            }
             KeyCode::Char('k') | KeyCode::Up => {
-                self.current = self.current.saturating_sub(1);
+                if key_event.modifiers == KeyModifiers::CONTROL {
+                    self.switch(Direction::Up);
+                } else {
+                    self.current = self.current.saturating_sub(1);
+                }
                 self.direction = Direction::Up;
             }
-            KeyCode::Char('J') => {
-                self.switch(Direction::Down);
-            }
             KeyCode::Char('j') | KeyCode::Down => {
-                if self.current < self.tasks.len().saturating_sub(1) {
-                    self.current += 1;
+                if key_event.modifiers == KeyModifiers::CONTROL {
+                    self.switch(Direction::Down);
+                } else {
+                    if self.current < self.tasks.len().saturating_sub(1) {
+                        self.current += 1;
+                    }
                 }
                 self.direction = Direction::Down;
             }
@@ -181,7 +183,7 @@ impl Todo<'_> {
 impl Widget for &Todo<'_> {
     fn render(self, area: Rect, buf: &mut Buffer) {
         let len = self.tasks.len();
-        let height = area.height as usize;
+        let height = area.height as usize - 2;
         let mut scroll = self.scroll.borrow_mut();
         *scroll = if len <= height {
             0
@@ -214,7 +216,7 @@ impl Widget for &Todo<'_> {
             .iter()
             .enumerate()
             .map(|(i, task)| {
-                if i == self.current - *scroll {
+                if i == self.current.saturating_sub(*scroll) {
                     let string = format!("{:<width$}", task.subject, width = area.width.into());
                     Line::from(string.white().on_red())
                 } else {
@@ -222,7 +224,25 @@ impl Widget for &Todo<'_> {
                 }
             })
             .collect();
-        Paragraph::new(lines).render(area, buf);
+
+        let keys = Line::from(vec![
+            " ".into(),
+            "j/k".red().into(),
+            " select | ".into(),
+            "^j/^k".red().into(),
+            " move | ".into(),
+            "a/+".red().into(),
+            " add | ".into(),
+            "enter".red().into(),
+            " view | ".into(),
+            "esc".red().into(),
+            " exit ".into(),
+        ]);
+        let block = Block::new()
+            .borders(Borders::ALL)
+            .title(" todo ")
+            .title_bottom(keys.right_aligned());
+        Paragraph::new(lines).block(block).render(area, buf);
     }
 }
 
