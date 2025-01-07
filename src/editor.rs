@@ -4,7 +4,7 @@ use ratatui::{
     layout::Rect,
     widgets::{Clear, Widget},
 };
-use tui_textarea::TextArea;
+use tui_textarea::{CursorMove, TextArea};
 
 enum EditorStatus {
     Hiding,
@@ -67,7 +67,14 @@ impl Editor<'_> {
         };
         self.textarea = TextArea::default();
         self.textarea.insert_str(text);
-        self.view();
+        self.textarea.move_cursor(CursorMove::Top);
+        self.textarea.move_cursor(CursorMove::End);
+
+        if subject.len() == 0 {
+            self.edit();
+        } else {
+            self.view();
+        }
     }
 
     fn done(&mut self) {
