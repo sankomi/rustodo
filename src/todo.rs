@@ -111,7 +111,7 @@ impl Todo<'_> {
                     self.editor.start(&task.subject, &task.body);
                 }
             }
-            KeyCode::Char('k') | KeyCode::Up => {
+            KeyCode::Char('k') => {
                 if key_event.modifiers == KeyModifiers::CONTROL {
                     self.switch(Direction::Up);
                 } else {
@@ -119,7 +119,7 @@ impl Todo<'_> {
                 }
                 self.direction = Direction::Up;
             }
-            KeyCode::Char('j') | KeyCode::Down => {
+            KeyCode::Char('j') => {
                 if key_event.modifiers == KeyModifiers::CONTROL {
                     self.switch(Direction::Down);
                 } else {
@@ -129,9 +129,16 @@ impl Todo<'_> {
                 }
                 self.direction = Direction::Down;
             }
-            KeyCode::Char('+') | KeyCode::Char('a') => {
+            KeyCode::Char('a') => {
                 self.edit_type = EditType::Adding;
                 self.editor.start("", "");
+            }
+            KeyCode::Char('d') => {
+                if key_event.modifiers == KeyModifiers::CONTROL {
+                    self.undo_current();
+                } else {
+                    self.done_current();
+                }
             }
             _ => (),
         };
@@ -141,6 +148,31 @@ impl Todo<'_> {
         if let Some(task) = self.tasks.get_mut(self.current) {
             task.subject = content.subject;
             task.body = content.body;
+            task.done = false;
+            self.db.update_one(task);
+            self.update();
+        }
+    }
+
+    fn done_current(&mut self) {
+        if let Some(task) = self.tasks.get_mut(self.current) {
+            if task.done {
+                return;
+            }
+
+            task.done = true;
+            self.db.update_one(task);
+            self.update();
+        }
+    }
+
+    fn undo_current(&mut self) {
+        if let Some(task) = self.tasks.get_mut(self.current) {
+            if !task.done {
+                return;
+            }
+
+            task.done = false;
             self.db.update_one(task);
             self.update();
         }
@@ -218,9 +250,18 @@ impl Widget for &Todo<'_> {
             .map(|(i, task)| {
                 if i == self.current.saturating_sub(*scroll) {
                     let string = format!("{:<width$}", task.subject, width = area.width.into());
-                    Line::from(string.white().on_red())
+                    if task.done {
+                        Line::from(string.black().on_red())
+                    } else {
+                        Line::from(string.white().on_red())
+                    }
                 } else {
-                    Line::from(task.subject.clone())
+                    let subject = task.subject.clone();
+                    if task.done {
+                        Line::from(subject.red())
+                    } else {
+                        Line::from(subject)
+                    }
                 }
             })
             .collect();
@@ -231,8 +272,12 @@ impl Widget for &Todo<'_> {
             " select | ".into(),
             "^j/^k".red().into(),
             " move | ".into(),
-            "a/+".red().into(),
+            "a".red().into(),
             " add | ".into(),
+            "d".red().into(),
+            " done | ".into(),
+            "^d".red().into(),
+            " undo | ".into(),
             "enter".red().into(),
             " view | ".into(),
             "esc".red().into(),
@@ -264,10 +309,10 @@ mod tests {
         todo.render(buf.area, &mut buf);
 
         let expected = Buffer::with_lines(vec![
-            "test_subject        ".white().on_red(),
-            "                    ".into(),
-            "                    ".into(),
-            "                    ".into(),
+            vec!["┌ todo ────────────┐".into()],
+            vec!["│".into(), "test_subject      ".white().on_red(), "│".into()],
+            vec!["│                  │".into()],
+            vec!["└".into(), "r".red(), " view | ".into(), "esc".red(), " exit ┘".into()],
         ]);
 
         assert_eq!(buf, expected);
