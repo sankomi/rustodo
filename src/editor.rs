@@ -23,6 +23,7 @@ pub struct Editor<'a> {
     status: EditorStatus,
     textarea: TextArea<'a>,
     content: Option<Content>,
+    done: bool,
 }
 
 impl Editor<'_> {
@@ -31,6 +32,7 @@ impl Editor<'_> {
             status: EditorStatus::Hiding,
             textarea: TextArea::default(),
             content: None,
+            done: false,
         }
     }
 
@@ -61,7 +63,8 @@ impl Editor<'_> {
         self.content.take()
     }
 
-    pub fn start(&mut self, subject: &str, body: &str) {
+    pub fn start(&mut self, subject: &str, body: &str, done: bool) {
+        self.done = done;
         let text = if body == "" {
             String::from(subject)
         } else {
@@ -115,7 +118,7 @@ impl Editor<'_> {
             String::from("")
         };
 
-        self.start(&subject, &body);
+        self.start(&subject, &body, self.done);
         self.content = Some(Content { subject, body });
     }
 
@@ -124,6 +127,10 @@ impl Editor<'_> {
     }
 
     fn edit(&mut self) {
+        if self.done {
+            return;
+        }
+
         self.status = EditorStatus::Editing;
     }
 

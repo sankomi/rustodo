@@ -67,6 +67,27 @@ impl Db {
         None
     }
 
+    pub fn delete_one(&self, id: i64) -> Option<Task> {
+        let sql = "
+            DELETE FROM tasks
+            WHERE id = ?
+            RETURNING *;
+        ";
+        let mut stat = self.connection.prepare(sql).unwrap();
+        stat.bind((1, id)).unwrap();
+        while let Ok(State::Row) = stat.next() {
+            return Some(Task {
+                id: stat.read::<i64, _>("id").unwrap(),
+                done: stat.read::<i64, _>("done").unwrap() == 1,
+                subject: stat.read::<String, _>("subject").unwrap(),
+                body: stat.read::<String, _>("body").unwrap(),
+                created: stat.read::<String, _>("created").unwrap(),
+            });
+        }
+
+        None
+    }
+
     pub fn get_one(&self, id: i64) -> Option<Task> {
         let sql = "SELECT * FROM tasks WHERE id = ?";
         let mut stat = self.connection.prepare(sql).unwrap();

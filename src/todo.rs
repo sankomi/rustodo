@@ -108,7 +108,7 @@ impl Todo<'_> {
             KeyCode::Enter => {
                 if let Some(task) = self.tasks.get(self.current) {
                     self.edit_type = EditType::Editing;
-                    self.editor.start(&task.subject, &task.body);
+                    self.editor.start(&task.subject, &task.body, task.done);
                 }
             }
             KeyCode::Char('k') => {
@@ -131,11 +131,11 @@ impl Todo<'_> {
             }
             KeyCode::Char('a') => {
                 self.edit_type = EditType::Adding;
-                self.editor.start("", "");
+                self.editor.start("", "", false);
             }
             KeyCode::Char('d') => {
                 if key_event.modifiers == KeyModifiers::CONTROL {
-                    self.undo_current();
+                    self.delete_current();
                 } else {
                     self.done_current();
                 }
@@ -148,7 +148,6 @@ impl Todo<'_> {
         if let Some(task) = self.tasks.get_mut(self.current) {
             task.subject = content.subject;
             task.body = content.body;
-            task.done = false;
             self.db.update_one(task);
             self.update();
         }
@@ -156,24 +155,15 @@ impl Todo<'_> {
 
     fn done_current(&mut self) {
         if let Some(task) = self.tasks.get_mut(self.current) {
-            if task.done {
-                return;
-            }
-
-            task.done = true;
+            task.done = !task.done;
             self.db.update_one(task);
             self.update();
         }
     }
 
-    fn undo_current(&mut self) {
+    fn delete_current(&mut self) {
         if let Some(task) = self.tasks.get_mut(self.current) {
-            if !task.done {
-                return;
-            }
-
-            task.done = false;
-            self.db.update_one(task);
+            self.db.delete_one(task.id);
             self.update();
         }
     }
@@ -242,6 +232,7 @@ impl Widget for &Todo<'_> {
             }
         };
 
+        let mut done = false;
         let from = cmp::min(*scroll, len.saturating_sub(1));
         let to = cmp::min(*scroll + height, len);
         let lines: Vec<_> = self.tasks[from..to]
@@ -251,6 +242,7 @@ impl Widget for &Todo<'_> {
                 if i == self.current.saturating_sub(*scroll) {
                     let string = format!("{:<width$}", task.subject, width = area.width.into());
                     if task.done {
+                        done = true;
                         Line::from(string.black().on_red())
                     } else {
                         Line::from(string.white().on_red())
@@ -275,9 +267,9 @@ impl Widget for &Todo<'_> {
             "a".red().into(),
             " add | ".into(),
             "d".red().into(),
-            " done | ".into(),
+            if done { " undo | " } else { " done | "}.into(),
             "^d".red().into(),
-            " undo | ".into(),
+            " delete | ".into(),
             "enter".red().into(),
             " view | ".into(),
             "esc".red().into(),
