@@ -84,6 +84,50 @@ impl Db {
         None
     }
 
+    pub fn get_next(&self, id: i64) -> Option<Task> {
+        let sql = "
+            SELECT * FROM tasks
+            WHERE id > ?
+            ORDER BY id ASC
+            LIMIT 1;
+        ";
+        let mut stat = self.connection.prepare(sql).unwrap();
+        stat.bind((1, id)).unwrap();
+        while let Ok(State::Row) = stat.next() {
+            return Some(Task {
+                id: stat.read::<i64, _>("id").unwrap(),
+                done: stat.read::<i64, _>("done").unwrap() == 1,
+                subject: stat.read::<String, _>("subject").unwrap(),
+                body: stat.read::<String, _>("body").unwrap(),
+                created: stat.read::<String, _>("created").unwrap(),
+            });
+        }
+
+        None
+    }
+
+    pub fn get_prev(&self, id: i64) -> Option<Task> {
+        let sql = "
+            SELECT * FROM tasks
+            WHERE id < ?
+            ORDER BY id DESC
+            LIMIT 1;
+        ";
+        let mut stat = self.connection.prepare(sql).unwrap();
+        stat.bind((1, id)).unwrap();
+        while let Ok(State::Row) = stat.next() {
+            return Some(Task {
+                id: stat.read::<i64, _>("id").unwrap(),
+                done: stat.read::<i64, _>("done").unwrap() == 1,
+                subject: stat.read::<String, _>("subject").unwrap(),
+                body: stat.read::<String, _>("body").unwrap(),
+                created: stat.read::<String, _>("created").unwrap(),
+            });
+        }
+
+        None
+    }
+
     pub fn update_one(&self, task: &Task) -> Option<Task> {
         let sql = "
             UPDATE tasks

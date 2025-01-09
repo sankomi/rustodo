@@ -188,8 +188,8 @@ impl Todo<'_> {
     fn switch(&mut self, direction: Direction) {
         if let Some(current) = self.tasks.get_mut(self.current) {
             if let Some(mut next) = match direction {
-                Direction::Up => self.db.get_one(current.id.saturating_sub(1)),
-                Direction::Down => self.db.get_one(current.id + 1),
+                Direction::Up => self.db.get_prev(current.id),
+                Direction::Down => self.db.get_next(current.id),
             } {
                 mem::swap(&mut current.id, &mut next.id);
                 self.db.update_one(&current);
