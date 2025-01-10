@@ -4,6 +4,7 @@ mod todo;
 use todo::Todo;
 mod db;
 mod editor;
+mod preview;
 
 fn main() -> io::Result<()> {
     let mut terminal = ratatui::init();

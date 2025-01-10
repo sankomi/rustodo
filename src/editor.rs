@@ -75,11 +75,7 @@ impl Editor<'_> {
         self.textarea.move_cursor(CursorMove::Top);
         self.textarea.move_cursor(CursorMove::End);
 
-        if subject.len() == 0 {
-            self.edit();
-        } else {
-            self.view();
-        }
+        self.edit();
     }
 
     fn done(&mut self) {
@@ -118,8 +114,8 @@ impl Editor<'_> {
             String::from("")
         };
 
-        self.start(&subject, &body, self.done);
         self.content = Some(Content { subject, body });
+        self.hide();
     }
 
     fn view(&mut self) {
@@ -153,21 +149,15 @@ impl Widget for &Editor<'_> {
             _ => "",
         };
         let keys = match self.status {
-            EditorStatus::Viewing => {
-                Line::from(vec![
-                    " ".into(),
-                    "enter".red().into(),
-                    " edit | ".into(),
-                    "esc".red().into(),
-                    " back ".into(),
-                ])
-            }
+            EditorStatus::Viewing => Line::from(vec![
+                " ".into(),
+                "enter".red().into(),
+                " edit | ".into(),
+                "esc".red().into(),
+                " back ".into(),
+            ]),
             EditorStatus::Editing => {
-                Line::from(vec![
-                    " ".into(),
-                    "esc".red().into(),
-                    " save ".into(),
-                ])
+                Line::from(vec![" ".into(), "esc".red().into(), " save ".into()])
             }
             _ => Line::from(""),
         };

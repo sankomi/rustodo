@@ -6,7 +6,7 @@ use std::mem;
 use ratatui::{
     buffer::Buffer,
     crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers},
-    layout::Rect,
+    layout::{Constraint, Direction as LayoutDirection, Layout, Rect},
     style::Stylize,
     text::Line,
     widgets::{Block, Borders, Paragraph, Widget},
@@ -16,6 +16,7 @@ use ratatui::{
 use crate::{
     db::{Db, Task},
     editor::{Content, Editor},
+    preview::Preview,
 };
 
 enum Direction {
@@ -32,6 +33,7 @@ enum EditType {
 pub struct Todo<'a> {
     db: Db,
     editor: Editor<'a>,
+    preview: Preview,
     tasks: Vec<Task>,
     current: usize,
     direction: Direction,
@@ -45,6 +47,7 @@ impl Todo<'_> {
         let mut todo = Self {
             db: Db::new(),
             editor: Editor::new(),
+            preview: Preview::new(),
             tasks: vec![],
             current: 0,
             direction: Direction::Down,
@@ -69,6 +72,17 @@ impl Todo<'_> {
 
     fn draw(&self, frame: &mut Frame) {
         frame.render_widget(self, frame.area());
+
+        let layout = Layout::default()
+            .direction(LayoutDirection::Horizontal)
+            .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
+            .split(frame.area());
+        let layout = Layout::default()
+            .direction(LayoutDirection::Vertical)
+            .constraints([Constraint::Min(1), Constraint::Length(1)])
+            .split(layout[1]);
+        frame.render_widget(&self.preview, layout[0]);
+
         frame.render_widget(&self.editor, frame.area());
     }
 
@@ -118,6 +132,7 @@ impl Todo<'_> {
                     self.current = self.current.saturating_sub(1);
                 }
                 self.direction = Direction::Up;
+                self.update_preview();
             }
             KeyCode::Char('j') => {
                 if key_event.modifiers == KeyModifiers::CONTROL {
@@ -128,6 +143,7 @@ impl Todo<'_> {
                     }
                 }
                 self.direction = Direction::Down;
+                self.update_preview();
             }
             KeyCode::Char('a') => {
                 self.edit_type = EditType::Adding;
@@ -170,8 +186,8 @@ impl Todo<'_> {
 
     fn add_task(&mut self, content: Content) {
         if let Some(_) = self.db.insert_one(&content.subject, &content.body) {
+            self.current = self.tasks.len();
             self.update();
-            self.current = self.tasks.len().saturating_sub(1);
         }
     }
 
@@ -193,12 +209,22 @@ impl Todo<'_> {
         }
     }
 
+    fn update_preview(&mut self) {
+        if let Some(task) = self.tasks.get(self.current) {
+            self.preview.show(&task.subject, &task.body);
+        } else {
+            self.preview.show(&String::new(), &String::new());
+        }
+    }
+
     fn update(&mut self) {
         self.tasks = self.db.list();
 
         if self.current >= self.tasks.len() {
             self.current = self.tasks.len().saturating_sub(1);
         }
+
+        self.update_preview();
     }
 }
 
@@ -267,11 +293,11 @@ impl Widget for &Todo<'_> {
             "a".red().into(),
             " add | ".into(),
             "d".red().into(),
-            if done { " undo | " } else { " done | "}.into(),
+            if done { " undo | " } else { " done | " }.into(),
             "^d".red().into(),
             " delete | ".into(),
             "enter".red().into(),
-            " view | ".into(),
+            " edit | ".into(),
             "esc".red().into(),
             " exit ".into(),
         ]);
@@ -302,9 +328,19 @@ mod tests {
 
         let expected = Buffer::with_lines(vec![
             vec!["┌ todo ────────────┐".into()],
-            vec!["│".into(), "test_subject      ".white().on_red(), "│".into()],
+            vec![
+                "│".into(),
+                "test_subject      ".white().on_red(),
+                "│".into(),
+            ],
             vec!["│                  │".into()],
-            vec!["└".into(), "r".red(), " view | ".into(), "esc".red(), " exit ┘".into()],
+            vec![
+                "└".into(),
+                "r".red(),
+                " edit | ".into(),
+                "esc".red(),
+                " exit ┘".into(),
+            ],
         ]);
 
         assert_eq!(buf, expected);
