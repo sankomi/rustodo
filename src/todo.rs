@@ -39,6 +39,7 @@ pub struct Todo<'a> {
     direction: Direction,
     scroll: RefCell<usize>,
     edit_type: EditType,
+    layout_direction: LayoutDirection,
     exit: bool,
 }
 
@@ -53,6 +54,7 @@ impl Todo<'_> {
             direction: Direction::Down,
             scroll: RefCell::new(0),
             edit_type: EditType::Done,
+            layout_direction: LayoutDirection::Horizontal,
             exit: false,
         };
 
@@ -63,7 +65,19 @@ impl Todo<'_> {
 
     pub fn run(&mut self, mut terminal: DefaultTerminal) -> io::Result<()> {
         while !self.exit {
-            terminal.draw(|frame| self.draw(frame))?;
+            terminal.draw(|frame| {
+                let width = frame.area().width;
+                let height = frame.area().height;
+                let layout_direction = if width >= height * 2 {
+                    LayoutDirection::Horizontal
+                } else {
+                    LayoutDirection::Vertical
+                };
+                self.layout_direction = layout_direction;
+                self.preview.set_direction(layout_direction);
+
+                self.draw(frame);
+            })?;
             self.handle_events()?;
         }
 
@@ -74,7 +88,7 @@ impl Todo<'_> {
         frame.render_widget(self, frame.area());
 
         let layout = Layout::default()
-            .direction(LayoutDirection::Horizontal)
+            .direction(self.layout_direction)
             .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
             .split(frame.area());
         let layout = Layout::default()
