@@ -5,6 +5,7 @@ use todo::Todo;
 mod db;
 mod editor;
 mod preview;
+mod date_picker;
 
 fn main() -> io::Result<()> {
     let mut terminal = ratatui::init();

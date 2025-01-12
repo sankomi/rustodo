@@ -17,6 +17,7 @@ use crate::{
     db::{Db, Task},
     editor::{Content, Editor},
     preview::Preview,
+    date_picker::DatePicker,
 };
 
 enum Direction {
@@ -34,6 +35,7 @@ pub struct Todo<'a> {
     db: Db,
     editor: Editor<'a>,
     preview: Preview,
+    date_picker: DatePicker,
     tasks: Vec<Task>,
     current: usize,
     direction: Direction,
@@ -49,6 +51,7 @@ impl Todo<'_> {
             db: Db::new(),
             editor: Editor::new(),
             preview: Preview::new(),
+            date_picker: DatePicker::new(),
             tasks: vec![],
             current: 0,
             direction: Direction::Down,
@@ -98,13 +101,18 @@ impl Todo<'_> {
         frame.render_widget(&self.preview, layout[0]);
 
         frame.render_widget(&self.editor, frame.area());
+        frame.render_widget(&self.date_picker, frame.area());
     }
 
     fn handle_events(&mut self) -> io::Result<()> {
         match event::read()? {
             Event::Key(key_event) => {
                 if key_event.kind == KeyEventKind::Press {
-                    if self.editor.handle_key_press_event(key_event) {
+                    if self.date_picker.handle_key_press_event(key_event) {
+                        if let Some(date) = self.date_picker.get_date() {
+                            self.update_due(date);
+                        }
+                    } else if self.editor.handle_key_press_event(key_event) {
                         if let Some(content) = self.editor.get_content() {
                             match self.edit_type {
                                 EditType::Editing => {
@@ -170,6 +178,9 @@ impl Todo<'_> {
                     self.done_current();
                 }
             }
+            KeyCode::Char('s') => {
+                self.pick_date();
+            }
             _ => (),
         };
     }
@@ -221,6 +232,13 @@ impl Todo<'_> {
                 self.update();
             }
         }
+    }
+
+    fn pick_date(&mut self) {
+        self.date_picker.start();
+    }
+
+    fn update_due(&mut self, date: String) {
     }
 
     fn update_preview(&mut self) {

@@ -8,6 +8,7 @@ pub struct Task {
     pub subject: String,
     pub body: String,
     pub created: String,
+    pub due: String,
 }
 
 pub struct Db {
@@ -39,7 +40,8 @@ impl Db {
                 done BOOLEAN NOT NULL DEFAULT 0,
                 subject VARCHAR(50) NOT NULL,
                 body TEXT NOT NULL DEFAULT '',
-                created DATETIME DEFAULT CURRENT_TIMESTAMP
+                created DATETIME DEFAULT CURRENT_TIMESTAMP,
+                due DATETIME DEFAULT NULL
             );
         ";
         self.connection.execute(sql).unwrap();
@@ -61,6 +63,10 @@ impl Db {
                 subject: stat.read::<String, _>("subject").unwrap(),
                 body: stat.read::<String, _>("body").unwrap(),
                 created: stat.read::<String, _>("created").unwrap(),
+                due: match stat.read::<String, _>("due") {
+                    Ok(string) => string,
+                    Err(_) => String::new(),
+                },
             });
         }
 
@@ -82,6 +88,10 @@ impl Db {
                 subject: stat.read::<String, _>("subject").unwrap(),
                 body: stat.read::<String, _>("body").unwrap(),
                 created: stat.read::<String, _>("created").unwrap(),
+                due: match stat.read::<String, _>("due") {
+                    Ok(string) => string,
+                    Err(_) => String::new(),
+                },
             });
         }
 
@@ -99,6 +109,10 @@ impl Db {
                 subject: stat.read::<String, _>("subject").unwrap(),
                 body: stat.read::<String, _>("body").unwrap(),
                 created: stat.read::<String, _>("created").unwrap(),
+                due: match stat.read::<String, _>("due") {
+                    Ok(string) => string,
+                    Err(_) => String::new(),
+                },
             });
         }
 
@@ -121,6 +135,10 @@ impl Db {
                 subject: stat.read::<String, _>("subject").unwrap(),
                 body: stat.read::<String, _>("body").unwrap(),
                 created: stat.read::<String, _>("created").unwrap(),
+                due: match stat.read::<String, _>("due") {
+                    Ok(string) => string,
+                    Err(_) => String::new(),
+                },
             });
         }
 
@@ -143,6 +161,10 @@ impl Db {
                 subject: stat.read::<String, _>("subject").unwrap(),
                 body: stat.read::<String, _>("body").unwrap(),
                 created: stat.read::<String, _>("created").unwrap(),
+                due: match stat.read::<String, _>("due") {
+                    Ok(string) => string,
+                    Err(_) => String::new(),
+                },
             });
         }
 
@@ -170,6 +192,10 @@ impl Db {
                 subject: stat.read::<String, _>("subject").unwrap(),
                 body: stat.read::<String, _>("body").unwrap(),
                 created: stat.read::<String, _>("created").unwrap(),
+                due: match stat.read::<String, _>("due") {
+                    Ok(string) => string,
+                    Err(_) => String::new(),
+                },
             });
         }
 
@@ -188,6 +214,10 @@ impl Db {
                 subject: stat.read::<String, _>("subject").unwrap(),
                 body: stat.read::<String, _>("body").unwrap(),
                 created: stat.read::<String, _>("created").unwrap(),
+                due: match stat.read::<String, _>("due") {
+                    Ok(string) => string,
+                    Err(_) => String::new(),
+                },
             };
             tasks.push(task);
         }
