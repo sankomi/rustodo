@@ -239,6 +239,10 @@ impl Todo<'_> {
     }
 
     fn update_due(&mut self, date: String) {
+        if let Some(task) = self.tasks.get_mut(self.current) {
+            task.due = date;
+            self.db.update_one(task);
+        }
     }
 
     fn update_preview(&mut self) {

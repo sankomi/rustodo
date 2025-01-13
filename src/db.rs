@@ -41,7 +41,7 @@ impl Db {
                 subject VARCHAR(50) NOT NULL,
                 body TEXT NOT NULL DEFAULT '',
                 created DATETIME DEFAULT CURRENT_TIMESTAMP,
-                due DATETIME DEFAULT NULL
+                due DATETIME NOT NULL DEFAULT ''
             );
         ";
         self.connection.execute(sql).unwrap();
@@ -63,10 +63,7 @@ impl Db {
                 subject: stat.read::<String, _>("subject").unwrap(),
                 body: stat.read::<String, _>("body").unwrap(),
                 created: stat.read::<String, _>("created").unwrap(),
-                due: match stat.read::<String, _>("due") {
-                    Ok(string) => string,
-                    Err(_) => String::new(),
-                },
+                due: stat.read::<String, _>("due").unwrap(),
             });
         }
 
@@ -88,10 +85,7 @@ impl Db {
                 subject: stat.read::<String, _>("subject").unwrap(),
                 body: stat.read::<String, _>("body").unwrap(),
                 created: stat.read::<String, _>("created").unwrap(),
-                due: match stat.read::<String, _>("due") {
-                    Ok(string) => string,
-                    Err(_) => String::new(),
-                },
+                due: stat.read::<String, _>("due").unwrap(),
             });
         }
 
@@ -109,10 +103,7 @@ impl Db {
                 subject: stat.read::<String, _>("subject").unwrap(),
                 body: stat.read::<String, _>("body").unwrap(),
                 created: stat.read::<String, _>("created").unwrap(),
-                due: match stat.read::<String, _>("due") {
-                    Ok(string) => string,
-                    Err(_) => String::new(),
-                },
+                due: stat.read::<String, _>("due").unwrap(),
             });
         }
 
@@ -135,10 +126,7 @@ impl Db {
                 subject: stat.read::<String, _>("subject").unwrap(),
                 body: stat.read::<String, _>("body").unwrap(),
                 created: stat.read::<String, _>("created").unwrap(),
-                due: match stat.read::<String, _>("due") {
-                    Ok(string) => string,
-                    Err(_) => String::new(),
-                },
+                due: stat.read::<String, _>("due").unwrap(),
             });
         }
 
@@ -161,10 +149,7 @@ impl Db {
                 subject: stat.read::<String, _>("subject").unwrap(),
                 body: stat.read::<String, _>("body").unwrap(),
                 created: stat.read::<String, _>("created").unwrap(),
-                due: match stat.read::<String, _>("due") {
-                    Ok(string) => string,
-                    Err(_) => String::new(),
-                },
+                due: stat.read::<String, _>("due").unwrap(),
             });
         }
 
@@ -176,7 +161,8 @@ impl Db {
             UPDATE tasks
             SET done = :done,
                 subject = :subject,
-                body = :body
+                body = :body,
+                due = :due
             WHERE id = :id
             RETURNING *;
         ";
@@ -185,6 +171,7 @@ impl Db {
         stat.bind((":done", if task.done { 1 } else { 0 })).unwrap();
         stat.bind((":subject", task.subject.as_str())).unwrap();
         stat.bind((":body", task.body.as_str())).unwrap();
+        stat.bind((":due", task.due.as_str())).unwrap();
         while let Ok(State::Row) = stat.next() {
             return Some(Task {
                 id: stat.read::<i64, _>("id").unwrap(),
@@ -192,10 +179,7 @@ impl Db {
                 subject: stat.read::<String, _>("subject").unwrap(),
                 body: stat.read::<String, _>("body").unwrap(),
                 created: stat.read::<String, _>("created").unwrap(),
-                due: match stat.read::<String, _>("due") {
-                    Ok(string) => string,
-                    Err(_) => String::new(),
-                },
+                due: stat.read::<String, _>("due").unwrap(),
             });
         }
 
@@ -214,10 +198,7 @@ impl Db {
                 subject: stat.read::<String, _>("subject").unwrap(),
                 body: stat.read::<String, _>("body").unwrap(),
                 created: stat.read::<String, _>("created").unwrap(),
-                due: match stat.read::<String, _>("due") {
-                    Ok(string) => string,
-                    Err(_) => String::new(),
-                },
+                due: stat.read::<String, _>("due").unwrap(),
             };
             tasks.push(task);
         }
