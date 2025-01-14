@@ -14,10 +14,10 @@ use ratatui::{
 };
 
 use crate::{
+    date_picker::DatePicker,
     db::{Db, Task},
     editor::{Content, Editor},
     preview::Preview,
-    date_picker::DatePicker,
 };
 
 enum Direction {

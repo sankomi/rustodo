@@ -39,14 +39,49 @@ impl DatePicker {
                 match key_event.code {
                     KeyCode::Esc => self.done(),
                     KeyCode::Char('h') => {
-                        self.position = self.position.saturating_sub(1);
+                        if self.position > 0 {
+                            self.position -= 1;
+                        } else {
+                            self.position = 7;
+                        }
                     }
                     KeyCode::Char('l') => {
                         if self.position < 7 {
                             self.position += 1;
+                        } else {
+                            self.position = 0;
                         }
                     }
-                    _ => (),
+                    KeyCode::Backspace => {
+                        self.position = self.position.saturating_sub(1);
+                    }
+                    KeyCode::Tab => {
+                        if self.position < 4 {
+                            self.position = 4;
+                        } else if self.position < 6 {
+                            self.position = 6;
+                        } else {
+                            self.position = 0;
+                        }
+                    }
+                    _ => {
+                        let int = Self::code_to_int(key_event.code);
+                        if int >= 0 {
+                            if self.position < 4 {
+                                self.year[self.position] = int;
+                            } else if self.position < 6 {
+                                self.month[self.position - 4] = int;
+                            } else if self.position < 8 {
+                                self.day[self.position - 6] = int;
+                            }
+
+                            if self.position < 7 {
+                                self.position += 1;
+                            } else {
+                                self.position = 0;
+                            }
+                        }
+                    }
                 };
                 return true;
             }
@@ -56,12 +91,38 @@ impl DatePicker {
         false
     }
 
+    fn code_to_int(code: KeyCode) -> i16 {
+        match code {
+            KeyCode::Char('0') => 0,
+            KeyCode::Char('1') => 1,
+            KeyCode::Char('2') => 2,
+            KeyCode::Char('3') => 3,
+            KeyCode::Char('4') => 4,
+            KeyCode::Char('5') => 5,
+            KeyCode::Char('6') => 6,
+            KeyCode::Char('7') => 7,
+            KeyCode::Char('8') => 8,
+            KeyCode::Char('9') => 9,
+            _ => -1,
+        }
+    }
+
     pub fn start(&mut self) {
         self.status = DatePickerStatus::Editing;
     }
 
     fn done(&mut self) {
-        self.date = Some(String::from("2025-01-01"));
+        self.date = Some(format!(
+            "{}{}{}{}/{}{}/{}{}",
+            self.year[0],
+            self.year[1],
+            self.year[2],
+            self.year[3],
+            self.month[0],
+            self.month[1],
+            self.day[0],
+            self.day[1],
+        ));
         self.hide();
     }
 
@@ -80,9 +141,7 @@ impl Widget for &DatePicker {
             return;
         }
 
-        let block = Block::new()
-            .title(" due ")
-            .borders(Borders::ALL);
+        let block = Block::new().title(" due ").borders(Borders::ALL);
 
         let layout = Layout::default()
             .direction(Direction::Horizontal)
@@ -117,7 +176,7 @@ impl Widget for &DatePicker {
         ];
         let position = if self.position >= 6 {
             self.position + 2
-        } else if self.position >= 4{
+        } else if self.position >= 4 {
             self.position + 1
         } else {
             self.position

@@ -36,20 +36,12 @@ impl Widget for &Preview {
 
         let corners = symbols::border::Set {
             top_left: match self.direction {
-                Direction::Horizontal => {
-                    symbols::line::NORMAL.horizontal_down
-                },
-                Direction::Vertical => {
-                    symbols::line::NORMAL.vertical_right
-                },
+                Direction::Horizontal => symbols::line::NORMAL.horizontal_down,
+                Direction::Vertical => symbols::line::NORMAL.vertical_right,
             },
             top_right: match self.direction {
-                Direction::Horizontal => {
-                    symbols::line::NORMAL.bottom_left
-                },
-                Direction::Vertical => {
-                    symbols::line::NORMAL.vertical_left
-                },
+                Direction::Horizontal => symbols::line::NORMAL.top_right,
+                Direction::Vertical => symbols::line::NORMAL.vertical_left,
             },
             ..symbols::border::PLAIN
         };
