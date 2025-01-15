@@ -235,7 +235,9 @@ impl Todo<'_> {
     }
 
     fn pick_date(&mut self) {
-        self.date_picker.start();
+        if let Some(task) = self.tasks.get(self.current) {
+            self.date_picker.start(&task.due);
+        }
     }
 
     fn update_due(&mut self, date: String) {

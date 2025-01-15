@@ -52,8 +52,15 @@ impl DatePicker {
                             self.position = 0;
                         }
                     }
+                    KeyCode::Char(' ') => {
+                        if self.position < 7 {
+                            self.position += 1;
+                        }
+                    }
                     KeyCode::Backspace => {
-                        self.position = self.position.saturating_sub(1);
+                        if self.position > 0 {
+                            self.position -= 1;
+                        }
                     }
                     KeyCode::Tab => {
                         if self.position < 4 {
@@ -62,6 +69,15 @@ impl DatePicker {
                             self.position = 6;
                         } else {
                             self.position = 0;
+                        }
+                    }
+                    KeyCode::BackTab => {
+                        if self.position < 4 {
+                            self.position = 6;
+                        } else if self.position < 6 {
+                            self.position = 0;
+                        } else {
+                            self.position = 4;
                         }
                     }
                     _ => {
@@ -107,22 +123,123 @@ impl DatePicker {
         }
     }
 
-    pub fn start(&mut self) {
+    pub fn start(&mut self, due: &String) {
+        if due.len() >= 10 {
+            self.set_year(&due[0..=3]);
+            self.set_month(&due[5..=6]);
+            self.set_day(&due[8..=9]);
+        } else {
+            self.year = [2, 0, 2, 5];
+            self.month = [0, 1];
+            self.day = [0, 1];
+        }
+
+        self.position = 0;
+
         self.status = DatePickerStatus::Editing;
     }
 
+    fn parse_four(string: &str) -> Option<[i16; 4]> {
+        let mut not_digit = false;
+        let res = string
+            .chars()
+            .map(|c| {
+                if let Some(value) = c.to_digit(10) {
+                    value as i16
+                } else {
+                    not_digit = true;
+                    0
+                }
+            })
+            .collect::<Vec<_>>()
+            .try_into();
+
+        if not_digit {
+            None
+        } else if let Ok(array) = res {
+            Some(array)
+        } else {
+            None
+        }
+    }
+
+    fn parse_two(string: &str) -> Option<[i16; 2]> {
+        let mut not_digit = false;
+        let res = string
+            .chars()
+            .map(|c| {
+                if let Some(value) = c.to_digit(10) {
+                    value as i16
+                } else {
+                    not_digit = true;
+                    0
+                }
+            })
+            .collect::<Vec<_>>()
+            .try_into();
+
+        if not_digit {
+            None
+        } else if let Ok(array) = res {
+            Some(array)
+        } else {
+            None
+        }
+    }
+
+    fn set_year(&mut self, string: &str) {
+        self.year = match Self::parse_four(string) {
+            Some(array) => array,
+            None => [2, 0, 2, 5],
+        };
+    }
+
+    fn set_month(&mut self, string: &str) {
+        self.month = match Self::parse_two(string) {
+            Some(array) => array,
+            None => [0, 1],
+        };
+    }
+
+    fn set_day(&mut self, string: &str) {
+        self.day = match Self::parse_two(string) {
+            Some(array) => array,
+            None => [0, 1],
+        };
+    }
+
     fn done(&mut self) {
-        self.date = Some(format!(
-            "{}{}{}{}/{}{}/{}{}",
-            self.year[0],
-            self.year[1],
-            self.year[2],
-            self.year[3],
-            self.month[0],
-            self.month[1],
-            self.day[0],
-            self.day[1],
-        ));
+        let year = self.year[0] * 1000 + self.year[1] * 100 + self.year[2] * 10 + self.year[3];
+        let mut month = self.month[0] * 10 + self.month[1];
+        let mut day = self.day[0] * 10 + self.day[1];
+        let leap_year = {
+            if year % 400 == 0 {
+                true
+            } else if year % 100 == 0 {
+                false
+            } else if year % 4 == 0 {
+                true
+            } else {
+                false
+            }
+        };
+
+        month = month.clamp(1, 12);
+
+        let max_day = if month == 2 {
+            if leap_year {
+                29
+            } else {
+                28
+            }
+        } else if matches!(month, 1 | 3 | 5 | 7 | 8 | 10 | 12) {
+            31
+        } else {
+            30
+        };
+        day = day.clamp(1, max_day);
+
+        self.date = Some(format!("{year:0>4}/{month:0>2}/{day:0>2}"));
         self.hide();
     }
 
