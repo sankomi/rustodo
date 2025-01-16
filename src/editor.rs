@@ -10,7 +10,6 @@ use tui_textarea::{CursorMove, TextArea};
 
 enum EditorStatus {
     Hiding,
-    Viewing,
     Editing,
 }
 
@@ -42,14 +41,6 @@ impl Editor<'_> {
                 match key_event.code {
                     KeyCode::Esc => self.done(),
                     _ => drop(self.textarea.input(key_event)),
-                };
-                return true;
-            }
-            EditorStatus::Viewing => {
-                match key_event.code {
-                    KeyCode::Enter => self.edit(),
-                    KeyCode::Esc => self.hide(),
-                    _ => (),
                 };
                 return true;
             }
@@ -118,10 +109,6 @@ impl Editor<'_> {
         self.hide();
     }
 
-    fn view(&mut self) {
-        self.status = EditorStatus::Viewing;
-    }
-
     fn edit(&mut self) {
         if self.done {
             return;
@@ -144,18 +131,10 @@ impl Widget for &Editor<'_> {
         Clear.render(area, buf);
 
         let title = match self.status {
-            EditorStatus::Viewing => " view ",
             EditorStatus::Editing => " edit ",
             _ => "",
         };
         let keys = match self.status {
-            EditorStatus::Viewing => Line::from(vec![
-                " ".into(),
-                "enter".red().into(),
-                " edit | ".into(),
-                "esc".red().into(),
-                " back ".into(),
-            ]),
             EditorStatus::Editing => {
                 Line::from(vec![" ".into(), "esc".red().into(), " save ".into()])
             }
