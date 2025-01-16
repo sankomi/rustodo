@@ -91,7 +91,9 @@ impl Editor<'_> {
         let subject = if let Some(line) = lines.get(0) {
             line.clone()
         } else {
-            String::from("(no subject)")
+            self.content = None;
+            self.hide();
+            return;
         };
 
         let body = if let Some(lines) = lines.get(1..) {
