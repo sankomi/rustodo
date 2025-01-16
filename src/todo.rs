@@ -304,7 +304,12 @@ impl Widget for &Todo<'_> {
             .enumerate()
             .map(|(i, task)| {
                 if i == self.current.saturating_sub(*scroll) {
-                    let string = format!("{:<width$}", task.subject, width = area.width.into());
+                    let string = format!(
+                        "{:>10} {:<width$}",
+                        task.due,
+                        task.subject,
+                        width = area.width.into(),
+                    );
                     if task.done {
                         done = true;
                         Line::from(string.black().on_red())
@@ -312,7 +317,7 @@ impl Widget for &Todo<'_> {
                         Line::from(string.white().on_red())
                     }
                 } else {
-                    let subject = task.subject.clone();
+                    let subject = format!("{:>10} {}", task.due, task.subject);
                     if task.done {
                         Line::from(subject.red())
                     } else {

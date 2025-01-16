@@ -37,7 +37,8 @@ impl DatePicker {
         match self.status {
             DatePickerStatus::Editing => {
                 match key_event.code {
-                    KeyCode::Esc => self.done(),
+                    KeyCode::Enter => self.done(),
+                    KeyCode::Esc => self.clear(),
                     KeyCode::Char('h') => {
                         if self.position > 0 {
                             self.position -= 1;
@@ -243,6 +244,11 @@ impl DatePicker {
         self.hide();
     }
 
+    fn clear(&mut self) {
+        self.date = Some(String::new());
+        self.hide();
+    }
+
     fn hide(&mut self) {
         self.status = DatePickerStatus::Hiding;
     }
@@ -258,13 +264,22 @@ impl Widget for &DatePicker {
             return;
         }
 
-        let block = Block::new().title(" due ").borders(Borders::ALL);
-
+        let keys = Line::from(vec![
+            " ".into(),
+            "enter".red(),
+            " save | ".into(),
+            "esc".red(),
+            " clear ".into(),
+        ]);
+        let block = Block::new()
+            .borders(Borders::ALL)
+            .title(" due ")
+            .title_bottom(keys.right_aligned());
         let layout = Layout::default()
             .direction(Direction::Horizontal)
             .constraints([
                 Constraint::Min(0),
-                Constraint::Length(12),
+                Constraint::Length(26),
                 Constraint::Min(0),
             ])
             .split(area);
@@ -301,7 +316,7 @@ impl Widget for &DatePicker {
         if let Some(span) = spans.get_mut(position) {
             *span = span.clone().on_red();
         }
-        let line = Line::from(spans);
+        let line = Line::from(spans).centered();
         Paragraph::new(line).block(block).render(area, buf);
     }
 }
