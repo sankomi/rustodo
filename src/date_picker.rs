@@ -39,6 +39,66 @@ impl DatePicker {
                 match key_event.code {
                     KeyCode::Enter => self.done(),
                     KeyCode::Esc => self.clear(),
+                    KeyCode::Char('j') => {
+                        if self.position < 4 {
+                            let mut year = self.year[0] * 1000 + self.year[1] * 100 + self.year[2] * 10 + self.year[3];
+                            year -= 10_i16.pow(3 - self.position as u32);
+                            while year < 0 {
+                                year += 10000;
+                            }
+                            self.year = Self::split_four(year);
+                        } else if self.position < 6 {
+                            let mut month = self.month[0] * 10 + self.month[1];
+                            month -= 1;
+                            while month < 1 {
+                                month += 12;
+                            }
+                            self.month = Self::split_two(month);
+                        } else if self.position < 8 {
+                            let year = self.year[0] * 1000 + self.year[1] * 100 + self.year[2] * 10 + self.year[3];
+                            let leap_year = Self::is_leap_year(year);
+
+                            let mut month = self.month[0] * 10 + self.month[1];
+                            month = month.clamp(1, 12);
+
+                            let mut day = self.day[0] * 10 + self.day[1];
+                            let max_day = Self::get_max_day(month, leap_year);
+
+                            day -=1;
+                            if day < 1 {
+                                day = max_day;
+                            }
+                            self.day = Self::split_two(day);
+                        }
+                    }
+                    KeyCode::Char('k') => {
+                        if self.position < 4 {
+                            let mut year = self.year[0] * 1000 + self.year[1] * 100 + self.year[2] * 10 + self.year[3];
+                            year += 10_i16.pow(3 - self.position as u32);
+                            year %= 10000;
+                            self.year = Self::split_four(year);
+                        } else if self.position < 6 {
+                            let mut month = self.month[0] * 10 + self.month[1];
+                            month %= 12;
+                            month += 1;
+                            self.month = Self::split_two(month);
+                        } else if self.position < 8 {
+                            let year = self.year[0] * 1000 + self.year[1] * 100 + self.year[2] * 10 + self.year[3];
+                            let leap_year = Self::is_leap_year(year);
+
+                            let mut month = self.month[0] * 10 + self.month[1];
+                            month = month.clamp(1, 12);
+
+                            let mut day = self.day[0] * 10 + self.day[1];
+                            let max_day = Self::get_max_day(month, leap_year);
+
+                            if day > max_day {
+                                day = 0;
+                            }
+                            day +=1;
+                            self.day = Self::split_two(day);
+                        }
+                    }
                     KeyCode::Char('h') => {
                         if self.position > 0 {
                             self.position -= 1;
@@ -106,6 +166,41 @@ impl DatePicker {
         }
 
         false
+    }
+
+    fn split_four(int: i16) -> [i16; 4] {
+        [int / 1000 % 10, int / 100 % 10, int / 10 % 10, int % 10]
+    }
+
+    fn split_two(int: i16) -> [i16; 2] {
+        let int = int % 100;
+        [int / 10 % 10, int % 10]
+    }
+
+    fn is_leap_year(year: i16) -> bool {
+        if year % 400 == 0 {
+            true
+        } else if year % 100 == 0 {
+            false
+        } else if year % 4 == 0 {
+            true
+        } else {
+            false
+        }
+    }
+
+    fn get_max_day(month: i16, leap_year: bool) -> i16 {
+        if month == 2 {
+            if leap_year {
+                29
+            } else {
+                28
+            }
+        } else if matches!(month, 1 | 3 | 5 | 7 | 8 | 10 | 12) {
+            31
+        } else {
+            30
+        }
     }
 
     fn code_to_int(code: KeyCode) -> i16 {
@@ -211,33 +306,13 @@ impl DatePicker {
 
     fn done(&mut self) {
         let year = self.year[0] * 1000 + self.year[1] * 100 + self.year[2] * 10 + self.year[3];
-        let mut month = self.month[0] * 10 + self.month[1];
-        let mut day = self.day[0] * 10 + self.day[1];
-        let leap_year = {
-            if year % 400 == 0 {
-                true
-            } else if year % 100 == 0 {
-                false
-            } else if year % 4 == 0 {
-                true
-            } else {
-                false
-            }
-        };
+        let leap_year = Self::is_leap_year(year);
 
+        let mut month = self.month[0] * 10 + self.month[1];
         month = month.clamp(1, 12);
 
-        let max_day = if month == 2 {
-            if leap_year {
-                29
-            } else {
-                28
-            }
-        } else if matches!(month, 1 | 3 | 5 | 7 | 8 | 10 | 12) {
-            31
-        } else {
-            30
-        };
+        let mut day = self.day[0] * 10 + self.day[1];
+        let max_day = Self::get_max_day(month, leap_year);
         day = day.clamp(1, max_day);
 
         self.date = Some(format!("{year:0>4}/{month:0>2}/{day:0>2}"));
