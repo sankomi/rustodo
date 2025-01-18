@@ -2,8 +2,6 @@ use ratatui::{
     buffer::Buffer,
     crossterm::event::{KeyCode, KeyEvent},
     layout::Rect,
-    style::Stylize,
-    text::Line,
     widgets::{Block, Borders, Clear, Widget},
 };
 use tui_textarea::{CursorMove, TextArea};
@@ -39,7 +37,7 @@ impl Editor<'_> {
         match self.status {
             EditorStatus::Editing => {
                 match key_event.code {
-                    KeyCode::Esc => self.done(),
+                    KeyCode::F(1) => self.done(),
                     _ => drop(self.textarea.input(key_event)),
                 };
                 return true;
@@ -136,17 +134,10 @@ impl Widget for &Editor<'_> {
             EditorStatus::Editing => " edit ",
             _ => "",
         };
-        let keys = match self.status {
-            EditorStatus::Editing => {
-                Line::from(vec![" ".into(), "esc".red().into(), " save ".into()])
-            }
-            _ => Line::from(""),
-        };
 
         let block = Block::new()
             .borders(Borders::ALL)
-            .title(title)
-            .title_bottom(keys.right_aligned());
+            .title(title);
         let inner = block.inner(area);
         block.render(area, buf);
         self.textarea.render(inner, buf);

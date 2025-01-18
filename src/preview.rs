@@ -34,20 +34,25 @@ impl Widget for &Preview {
     fn render(self, area: Rect, buf: &mut Buffer) {
         let text = self.subject.clone() + "\n\n" + &self.body;
 
-        let corners = symbols::border::Set {
-            top_left: match self.direction {
-                Direction::Horizontal => symbols::line::NORMAL.horizontal_down,
-                Direction::Vertical => symbols::line::NORMAL.vertical_right,
-            },
-            top_right: match self.direction {
-                Direction::Horizontal => symbols::line::NORMAL.top_right,
-                Direction::Vertical => symbols::line::NORMAL.vertical_left,
-            },
-            ..symbols::border::PLAIN
+        let corners = match self.direction {
+            Direction::Horizontal => {
+                symbols::border::Set {
+                    top_left: symbols::line::NORMAL.horizontal_down,
+                    bottom_left: symbols::line::NORMAL.horizontal_up,
+                    ..symbols::border::PLAIN
+                }
+            }
+            Direction::Vertical => {
+                symbols::border::Set {
+                    top_left: symbols::line::NORMAL.vertical_right,
+                    top_right: symbols::line::NORMAL.vertical_left,
+                    ..symbols::border::PLAIN
+                }
+            }
         };
         let block = Block::new()
             .border_set(corners)
-            .borders(Borders::TOP | Borders::LEFT | Borders::RIGHT);
+            .borders(Borders::ALL);
         Clear.render(area, buf);
         Paragraph::new(text).block(block).render(area, buf);
     }

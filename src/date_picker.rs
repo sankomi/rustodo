@@ -37,8 +37,7 @@ impl DatePicker {
         match self.status {
             DatePickerStatus::Editing => {
                 match key_event.code {
-                    KeyCode::Enter => self.done(),
-                    KeyCode::Esc => self.clear(),
+                    KeyCode::F(1) => self.done(),
                     KeyCode::Char('j') => {
                         if self.position < 4 {
                             let mut year = self.year[0] * 1000 + self.year[1] * 100 + self.year[2] * 10 + self.year[3];
@@ -50,9 +49,13 @@ impl DatePicker {
                         } else if self.position < 6 {
                             let mut month = self.month[0] * 10 + self.month[1];
                             month -= 1;
+                            if month > 12 {
+                                month = 12;
+                            }
                             while month < 1 {
                                 month += 12;
                             }
+                            self.position = 5;
                             self.month = Self::split_two(month);
                         } else if self.position < 8 {
                             let year = self.year[0] * 1000 + self.year[1] * 100 + self.year[2] * 10 + self.year[3];
@@ -65,9 +68,13 @@ impl DatePicker {
                             let max_day = Self::get_max_day(month, leap_year);
 
                             day -=1;
+                            if day > max_day {
+                                day = max_day;
+                            }
                             if day < 1 {
                                 day = max_day;
                             }
+                            self.position = 7;
                             self.day = Self::split_two(day);
                         }
                     }
@@ -81,6 +88,7 @@ impl DatePicker {
                             let mut month = self.month[0] * 10 + self.month[1];
                             month %= 12;
                             month += 1;
+                            self.position = 5;
                             self.month = Self::split_two(month);
                         } else if self.position < 8 {
                             let year = self.year[0] * 1000 + self.year[1] * 100 + self.year[2] * 10 + self.year[3];
@@ -96,6 +104,7 @@ impl DatePicker {
                                 day = 0;
                             }
                             day +=1;
+                            self.position = 7;
                             self.day = Self::split_two(day);
                         }
                     }
@@ -319,11 +328,6 @@ impl DatePicker {
         self.hide();
     }
 
-    fn clear(&mut self) {
-        self.date = Some(String::new());
-        self.hide();
-    }
-
     fn hide(&mut self) {
         self.status = DatePickerStatus::Hiding;
     }
@@ -339,22 +343,14 @@ impl Widget for &DatePicker {
             return;
         }
 
-        let keys = Line::from(vec![
-            " ".into(),
-            "enter".red(),
-            " save | ".into(),
-            "esc".red(),
-            " clear ".into(),
-        ]);
         let block = Block::new()
             .borders(Borders::ALL)
-            .title(" due ")
-            .title_bottom(keys.right_aligned());
+            .title(" due ");
         let layout = Layout::default()
             .direction(Direction::Horizontal)
             .constraints([
                 Constraint::Min(0),
-                Constraint::Length(26),
+                Constraint::Length(12),
                 Constraint::Min(0),
             ])
             .split(area);

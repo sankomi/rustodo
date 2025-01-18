@@ -5,7 +5,7 @@ use std::mem;
 
 use ratatui::{
     buffer::Buffer,
-    crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers},
+    crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind},
     layout::{Constraint, Direction as LayoutDirection, Layout, Rect},
     style::Stylize,
     text::Line,
@@ -94,11 +94,7 @@ impl Todo<'_> {
             .direction(self.layout_direction)
             .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
             .split(frame.area());
-        let layout = Layout::default()
-            .direction(LayoutDirection::Vertical)
-            .constraints([Constraint::Min(1), Constraint::Length(1)])
-            .split(layout[1]);
-        frame.render_widget(&self.preview, layout[0]);
+        frame.render_widget(&self.preview, layout[1]);
 
         frame.render_widget(&self.editor, frame.area());
         frame.render_widget(&self.date_picker, frame.area());
@@ -138,48 +134,50 @@ impl Todo<'_> {
 
     fn handle_key_press_event(&mut self, key_event: KeyEvent) {
         match key_event.code {
-            KeyCode::Esc => {
+            KeyCode::F(1) => {
                 self.exit = true;
             }
-            KeyCode::Enter => {
+            KeyCode::Char('k') => {
+                self.current = self.current.saturating_sub(1);
+                self.direction = Direction::Up;
+                self.update_preview();
+            }
+            KeyCode::Char('K') => {
+                self.switch(Direction::Up);
+                self.direction = Direction::Up;
+            }
+            KeyCode::Char('j') => {
+                if self.current < self.tasks.len().saturating_sub(1) {
+                    self.current += 1;
+                }
+                self.direction = Direction::Down;
+                self.update_preview();
+            }
+            KeyCode::Char('J') => {
+                self.switch(Direction::Down);
+                self.direction = Direction::Down;
+            }
+            KeyCode::Char('a') => {
                 if let Some(task) = self.tasks.get(self.current) {
                     self.edit_type = EditType::Editing;
                     self.editor.start(&task.subject, &task.body, task.done);
                 }
             }
-            KeyCode::Char('k') => {
-                if key_event.modifiers == KeyModifiers::CONTROL {
-                    self.switch(Direction::Up);
-                } else {
-                    self.current = self.current.saturating_sub(1);
-                }
-                self.direction = Direction::Up;
-                self.update_preview();
-            }
-            KeyCode::Char('j') => {
-                if key_event.modifiers == KeyModifiers::CONTROL {
-                    self.switch(Direction::Down);
-                } else {
-                    if self.current < self.tasks.len().saturating_sub(1) {
-                        self.current += 1;
-                    }
-                }
-                self.direction = Direction::Down;
-                self.update_preview();
-            }
-            KeyCode::Char('a') => {
+            KeyCode::Char('A') => {
                 self.edit_type = EditType::Adding;
                 self.editor.start("", "", false);
             }
-            KeyCode::Char('d') => {
-                if key_event.modifiers == KeyModifiers::CONTROL {
-                    self.delete_current();
-                } else {
-                    self.done_current();
-                }
-            }
             KeyCode::Char('s') => {
                 self.pick_date();
+            }
+            KeyCode::Char('S') => {
+                self.clear_date();
+            }
+            KeyCode::Char('d') => {
+                self.done_current();
+            }
+            KeyCode::Char('D') => {
+                self.delete_current();
             }
             _ => (),
         };
@@ -237,6 +235,13 @@ impl Todo<'_> {
     fn pick_date(&mut self) {
         if let Some(task) = self.tasks.get(self.current) {
             self.date_picker.start(&task.due);
+        }
+    }
+
+    fn clear_date(&mut self) {
+        if let Some(task) = self.tasks.get_mut(self.current) {
+            task.due = String::new();
+            self.db.update_one(task);
         }
     }
 
@@ -327,27 +332,9 @@ impl Widget for &Todo<'_> {
             })
             .collect();
 
-        let keys = Line::from(vec![
-            " ".into(),
-            "j/k".red().into(),
-            " select | ".into(),
-            "^j/^k".red().into(),
-            " move | ".into(),
-            "a".red().into(),
-            " add | ".into(),
-            "d".red().into(),
-            if done { " undo | " } else { " done | " }.into(),
-            "^d".red().into(),
-            " delete | ".into(),
-            "enter".red().into(),
-            " edit | ".into(),
-            "esc".red().into(),
-            " exit ".into(),
-        ]);
         let block = Block::new()
             .borders(Borders::ALL)
-            .title(" todo ")
-            .title_bottom(keys.right_aligned());
+            .title(" todo ");
         Paragraph::new(lines).block(block).render(area, buf);
     }
 }
@@ -364,25 +351,21 @@ mod tests {
             done: false,
             subject: String::from("test_subject"),
             body: String::from("test_body"),
+            due: String::from("2025/01/01"),
             created: String::from("2024-12-29 14:00:00"),
         }];
-        let mut buf = Buffer::empty(Rect::new(0, 0, 20, 4));
+        let mut buf = Buffer::empty(Rect::new(0, 0, 50, 4));
         todo.render(buf.area, &mut buf);
 
         let expected = Buffer::with_lines(vec![
-            vec!["┌ todo ────────────┐".into()],
+            vec!["┌ todo ──────────────────────────────────────────┐".into()],
             vec![
                 "│".into(),
-                "test_subject      ".white().on_red(),
+                 "2025/01/01 test_subject                         ".white().on_red(),
                 "│".into(),
             ],
-            vec!["│                  │".into()],
-            vec![
-                "└".into(),
-                "r".red(),
-                " edit | ".into(),
-                "esc".red(),
-                " exit ┘".into(),
+            vec!["│                                                │".into()],
+            vec!["└────────────────────────────────────────────────┘".into(),
             ],
         ]);
 
@@ -392,7 +375,7 @@ mod tests {
     #[test]
     fn test_key_event() {
         let mut todo = Todo::new();
-        todo.handle_key_press_event(KeyCode::Esc.into());
+        todo.handle_key_press_event(KeyCode::F(1).into());
         assert!(todo.exit);
     }
 }
