@@ -1,3 +1,4 @@
+use chrono::Local;
 use ratatui::{
     buffer::Buffer,
     crossterm::event::{KeyCode, KeyEvent},
@@ -229,15 +230,14 @@ impl DatePicker {
     }
 
     pub fn start(&mut self, due: &String) {
-        if due.len() >= 10 {
-            self.set_year(&due[0..=3]);
-            self.set_month(&due[5..=6]);
-            self.set_day(&due[8..=9]);
-        } else {
-            self.year = [2, 0, 2, 5];
-            self.month = [0, 1];
-            self.day = [0, 1];
+        let mut date = due;
+        let today = format!("{}", Local::now().format("%Y/%m/%d"));
+        if date.len() < 10 {
+            date = &today;
         }
+        self.set_year(&date[0..=3]);
+        self.set_month(&date[5..=6]);
+        self.set_day(&date[8..=9]);
 
         self.position = 0;
 
@@ -295,21 +295,30 @@ impl DatePicker {
     fn set_year(&mut self, string: &str) {
         self.year = match Self::parse_four(string) {
             Some(array) => array,
-            None => [2, 0, 2, 5],
+            None => {
+                let year = format!("{}", Local::now().format("%Y"));
+                Self::parse_four(&year).unwrap()
+            }
         };
     }
 
     fn set_month(&mut self, string: &str) {
         self.month = match Self::parse_two(string) {
             Some(array) => array,
-            None => [0, 1],
+            None => {
+                let month = format!("{}", Local::now().format("%m"));
+                Self::parse_two(&month).unwrap()
+            }
         };
     }
 
     fn set_day(&mut self, string: &str) {
         self.day = match Self::parse_two(string) {
             Some(array) => array,
-            None => [0, 1],
+            None => {
+                let day = format!("{}", Local::now().format("%d"));
+                Self::parse_two(&day).unwrap()
+            }
         };
     }
 
