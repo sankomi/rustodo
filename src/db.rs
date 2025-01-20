@@ -1,8 +1,15 @@
 use std::path::Path;
 
-use sqlite::{State, Connection};
+use sqlite::{Connection, State};
 
-use super::Stuff;
+pub struct Task {
+    pub id: i64,
+    pub done: bool,
+    pub subject: String,
+    pub body: String,
+    pub created: String,
+    pub due: String,
+}
 
 pub struct Db {
     connection: Connection,
@@ -10,76 +17,264 @@ pub struct Db {
 
 impl Db {
     pub fn new() -> Self {
-        let ready = Path::new("sqlite.db").exists();
+        #[cfg(not(test))]
+        let file = "sqlite.db";
+        #[cfg(test)]
+        let file = "test.db";
 
-        let connection = sqlite::open("sqlite.db").unwrap();
+        let exists = Path::new(file).exists();
+        let connection = sqlite::open(file).unwrap();
+        let db = Db { connection };
 
-        if !ready {
-            let query = "
-                CREATE TABLE todos (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    done BOOLEAN DEFAULT 0,
-                    title VARCHAR(255) DEFAULT '',
-                    content TEXT DEFAULT ''
-                );
-            ";
-            connection.execute(query).unwrap();
+        if !exists {
+            db.init_tables();
         }
 
-        Db { connection }
+        db
     }
 
-    pub fn get_todos(&self) -> (Vec<Stuff>, Vec<Stuff>) {
-        let mut todos: Vec<Stuff> = vec![];
-        let mut dones: Vec<Stuff> = vec![];
+    fn init_tables(&self) {
+        let sql = "
+            CREATE TABLE tasks (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                done BOOLEAN NOT NULL DEFAULT 0,
+                subject VARCHAR(50) NOT NULL,
+                body TEXT NOT NULL DEFAULT '',
+                created DATETIME DEFAULT CURRENT_TIMESTAMP,
+                due DATETIME NOT NULL DEFAULT ''
+            );
+        ";
+        self.connection.execute(sql).unwrap();
+    }
 
-        let query = "SELECT * FROM todos;";
-        let mut stat = self.connection.prepare(query).unwrap();
+    pub fn insert_one(&self, subject: &str, body: &str) -> Option<Task> {
+        let sql = "
+            INSERT INTO tasks (subject, body)
+            VALUES (?, ?)
+            RETURNING *;
+        ";
+        let mut stat = self.connection.prepare(sql).unwrap();
+        stat.bind((1, subject)).unwrap();
+        stat.bind((2, body)).unwrap();
         while let Ok(State::Row) = stat.next() {
-            let id = stat.read::<i64, _>("id").unwrap();
-            let done = stat.read::<i64, _>("done").unwrap() == 1;
-            let title = stat.read::<String, _>("title").unwrap();
-            let content = stat.read::<String, _>("content").unwrap();
-            let stuff = Stuff { id, title, content };
-
-            if done {
-                dones.push(stuff);
-            } else {
-                todos.push(stuff);
-            }
+            return Some(Task {
+                id: stat.read::<i64, _>("id").unwrap(),
+                done: stat.read::<i64, _>("done").unwrap() == 1,
+                subject: stat.read::<String, _>("subject").unwrap(),
+                body: stat.read::<String, _>("body").unwrap(),
+                created: stat.read::<String, _>("created").unwrap(),
+                due: stat.read::<String, _>("due").unwrap(),
+            });
         }
 
-        (todos, dones)
+        None
     }
 
-    pub fn flip(&self, id: i64) {
-        let query = "SELECT * FROM todos WHERE id = ?;";
-        let stat = self.connection.prepare(query).unwrap();
-        let rows = stat.into_iter().bind((1, id)).unwrap().map(|row| row.unwrap());
+    pub fn delete_one(&self, id: i64) -> Option<Task> {
+        let sql = "
+            DELETE FROM tasks
+            WHERE id = ?
+            RETURNING *;
+        ";
+        let mut stat = self.connection.prepare(sql).unwrap();
+        stat.bind((1, id)).unwrap();
+        while let Ok(State::Row) = stat.next() {
+            return Some(Task {
+                id: stat.read::<i64, _>("id").unwrap(),
+                done: stat.read::<i64, _>("done").unwrap() == 1,
+                subject: stat.read::<String, _>("subject").unwrap(),
+                body: stat.read::<String, _>("body").unwrap(),
+                created: stat.read::<String, _>("created").unwrap(),
+                due: stat.read::<String, _>("due").unwrap(),
+            });
+        }
 
-        for row in rows {
-            let done = 1 - row.read::<i64, _>("done");
-            let query = "UPDATE todos SET done = ? WHERE id = ?;";
-            let stat = self.connection.prepare(query).unwrap();
-            stat.into_iter().bind((1, done)).unwrap().bind((2, id)).unwrap().next();
-            break;
+        None
+    }
+
+    pub fn get_one(&self, id: i64) -> Option<Task> {
+        let sql = "SELECT * FROM tasks WHERE id = ?";
+        let mut stat = self.connection.prepare(sql).unwrap();
+        stat.bind((1, id)).unwrap();
+        while let Ok(State::Row) = stat.next() {
+            return Some(Task {
+                id: stat.read::<i64, _>("id").unwrap(),
+                done: stat.read::<i64, _>("done").unwrap() == 1,
+                subject: stat.read::<String, _>("subject").unwrap(),
+                body: stat.read::<String, _>("body").unwrap(),
+                created: stat.read::<String, _>("created").unwrap(),
+                due: stat.read::<String, _>("due").unwrap(),
+            });
+        }
+
+        None
+    }
+
+    pub fn get_next(&self, id: i64) -> Option<Task> {
+        let sql = "
+            SELECT * FROM tasks
+            WHERE id > ?
+            ORDER BY id ASC
+            LIMIT 1;
+        ";
+        let mut stat = self.connection.prepare(sql).unwrap();
+        stat.bind((1, id)).unwrap();
+        while let Ok(State::Row) = stat.next() {
+            return Some(Task {
+                id: stat.read::<i64, _>("id").unwrap(),
+                done: stat.read::<i64, _>("done").unwrap() == 1,
+                subject: stat.read::<String, _>("subject").unwrap(),
+                body: stat.read::<String, _>("body").unwrap(),
+                created: stat.read::<String, _>("created").unwrap(),
+                due: stat.read::<String, _>("due").unwrap(),
+            });
+        }
+
+        None
+    }
+
+    pub fn get_prev(&self, id: i64) -> Option<Task> {
+        let sql = "
+            SELECT * FROM tasks
+            WHERE id < ?
+            ORDER BY id DESC
+            LIMIT 1;
+        ";
+        let mut stat = self.connection.prepare(sql).unwrap();
+        stat.bind((1, id)).unwrap();
+        while let Ok(State::Row) = stat.next() {
+            return Some(Task {
+                id: stat.read::<i64, _>("id").unwrap(),
+                done: stat.read::<i64, _>("done").unwrap() == 1,
+                subject: stat.read::<String, _>("subject").unwrap(),
+                body: stat.read::<String, _>("body").unwrap(),
+                created: stat.read::<String, _>("created").unwrap(),
+                due: stat.read::<String, _>("due").unwrap(),
+            });
+        }
+
+        None
+    }
+
+    pub fn update_one(&self, task: &Task) -> Option<Task> {
+        let sql = "
+            UPDATE tasks
+            SET done = :done,
+                subject = :subject,
+                body = :body,
+                due = :due
+            WHERE id = :id
+            RETURNING *;
+        ";
+        let mut stat = self.connection.prepare(sql).unwrap();
+        stat.bind((":id", task.id)).unwrap();
+        stat.bind((":done", if task.done { 1 } else { 0 })).unwrap();
+        stat.bind((":subject", task.subject.as_str())).unwrap();
+        stat.bind((":body", task.body.as_str())).unwrap();
+        stat.bind((":due", task.due.as_str())).unwrap();
+        while let Ok(State::Row) = stat.next() {
+            return Some(Task {
+                id: stat.read::<i64, _>("id").unwrap(),
+                done: stat.read::<i64, _>("done").unwrap() == 1,
+                subject: stat.read::<String, _>("subject").unwrap(),
+                body: stat.read::<String, _>("body").unwrap(),
+                created: stat.read::<String, _>("created").unwrap(),
+                due: stat.read::<String, _>("due").unwrap(),
+            });
+        }
+
+        None
+    }
+
+    pub fn list(&self) -> Vec<Task> {
+        let mut tasks = vec![];
+
+        let sql = "SELECT * FROM tasks;";
+        let mut stat = self.connection.prepare(sql).unwrap();
+        while let Ok(State::Row) = stat.next() {
+            let task = Task {
+                id: stat.read::<i64, _>("id").unwrap(),
+                done: stat.read::<i64, _>("done").unwrap() == 1,
+                subject: stat.read::<String, _>("subject").unwrap(),
+                body: stat.read::<String, _>("body").unwrap(),
+                created: stat.read::<String, _>("created").unwrap(),
+                due: stat.read::<String, _>("due").unwrap(),
+            };
+            tasks.push(task);
+        }
+
+        tasks
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_insert_one() {
+        let subject = "test_subject";
+        let body = "test_body";
+
+        let db = Db::new();
+        let insert = db.insert_one(subject, body);
+        if let Some(task) = insert {
+            assert_eq!(task.subject, subject);
+            assert_eq!(task.body, body);
+        } else {
+            assert!(false, "failed to insert task!");
         }
     }
 
-    pub fn add_todo(&self, title: &str, content: &str) {
-        let query = "INSERT INTO todos (title, content) VALUES (?, ?);";
-        let mut stat = self.connection.prepare(query).unwrap();
-        stat.bind((1, title)).unwrap();
-        stat.bind((2, content)).unwrap();
-        stat.next().unwrap();
+    #[test]
+    fn test_insert_then_get_one() {
+        let id;
+        let subject = "test_subject";
+        let body = "test_body";
+
+        let db = Db::new();
+        let insert = db.insert_one(subject, body);
+        if let Some(task) = insert {
+            id = task.id;
+        } else {
+            assert!(false, "failed to insert task!");
+            return;
+        }
+
+        let get = db.get_one(id);
+        if let Some(task) = get {
+            assert_eq!(task.subject, subject);
+            assert_eq!(task.body, body);
+        } else {
+            assert!(false, "failed to get task!");
+        }
     }
 
-    pub fn edit_todo(&self, id: i64, title: &str, content: &str) {
-        let query = "UPDATE todos SET title = ?, content = ? WHERE id = ?;";
-        let mut stat = self.connection.prepare(query).unwrap();
-        stat.bind((1, title)).unwrap();
-        stat.bind((2, content)).unwrap();
-        stat.bind((3, id)).unwrap();
-        stat.next().unwrap();
+    #[test]
+    fn test_insert_then_update_one() {
+        let subject = "test_subject";
+        let body = "test_body";
+        let new_subject = "new_test_subject";
+        let new_body = "new_test_body";
+
+        let db = Db::new();
+        let insert = db.insert_one(subject, body);
+        let mut inserted;
+        if let Some(task) = insert {
+            inserted = task;
+        } else {
+            assert!(false, "failed to insert task!");
+            return;
+        }
+
+        inserted.subject = new_subject.to_string();
+        inserted.body = new_body.to_string();
+        let update = db.update_one(&inserted);
+        if let Some(task) = update {
+            assert_eq!(task.subject, new_subject);
+            assert_eq!(task.body, new_body);
+        } else {
+            assert!(false, "failed to update task!");
+        }
     }
 }
