@@ -101,7 +101,7 @@ impl DatePicker {
                             let mut day = self.day[0] * 10 + self.day[1];
                             let max_day = Self::get_max_day(month, leap_year);
 
-                            if day > max_day {
+                            if day >= max_day {
                                 day = 0;
                             }
                             day +=1;
